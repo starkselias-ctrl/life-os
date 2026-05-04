@@ -197,7 +197,7 @@ export default function App(){
   );
 
   // ── TASK ROW ──
-  const TaskRow = ({t, showArea})=>(
+  const TaskRow = ({t, showArea}) =>(
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
       <button onClick={()=>toggle(t.id)}
         style={{width:26,height:26,borderRadius:13,
@@ -373,8 +373,10 @@ export default function App(){
         </div>
       </div>
 
-      <TabBar/>
-      <TaskDetailSheet/>
+      <TabBar tab={tab} setTab={setTab} setView={setView}/>
+      <TaskDetailSheet detailId={detailId} editForm={editForm} setEditForm={setEditForm}
+        onToggle={()=>{toggle(detailId);closeDetail();}} onDelete={()=>delTask(detailId)}
+        onSave={saveDetail} onClose={closeDetail} areas={areas}/>
 
       {showAreaMgr&&(
         <Sheet onClose={()=>setShowAreaMgr(false)} tall>
@@ -437,7 +439,7 @@ export default function App(){
               <div style={{...glass(0.8),borderRadius:20,overflow:"hidden",marginBottom:10}}>
                 {open.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t}/>
+                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail}/>
                     {i<open.length-1&&<div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
@@ -457,7 +459,7 @@ export default function App(){
                 </button>
                 {showDone&&done.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t}/>
+                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail}/>
                     {i<done.length-1&&<div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
@@ -471,8 +473,10 @@ export default function App(){
             )}
           </div>
         </div>
-        <TabBar/>
-        <TaskDetailSheet/>
+        <TabBar tab={tab} setTab={setTab} setView={setView}/>
+        <TaskDetailSheet detailId={detailId} editForm={editForm} setEditForm={setEditForm}
+          onToggle={()=>{toggle(detailId);closeDetail();}} onDelete={()=>delTask(detailId)}
+          onSave={saveDetail} onClose={closeDetail} areas={areas}/>
         {showAreaMgr&&(
           <Sheet onClose={()=>setShowAreaMgr(false)} tall>
             <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",marginBottom:20}}>Edit area</div>
@@ -556,8 +560,10 @@ export default function App(){
             {scheduled.length===0&&<div style={{textAlign:"center",padding:"32px 0",color:"#8E8E93",fontSize:14}}>No tasks scheduled today.<br/>Tap any task to add a time.</div>}
           </div>
         </div>
-        <TabBar/>
-        <TaskDetailSheet/>
+        <TabBar tab={tab} setTab={setTab} setView={setView}/>
+        <TaskDetailSheet detailId={detailId} editForm={editForm} setEditForm={setEditForm}
+          onToggle={()=>{toggle(detailId);closeDetail();}} onDelete={()=>delTask(detailId)}
+          onSave={saveDetail} onClose={closeDetail} areas={areas}/>
       </div>
     );
   }
@@ -700,8 +706,119 @@ export default function App(){
   return null;
 }
 
-// ── SHARED COMPONENTS ──
-function Sheet({children,onClose,tall}){
+// ── TASK DETAIL SHEET (outside App to prevent remount on keystroke) ──
+function TaskDetailSheet({detailId, editForm, setEditForm, onToggle, onDelete, onSave, onClose, areas}){
+  if(!detailId||!editForm) return null;
+  return(
+    <Sheet onClose={onClose} tall>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",letterSpacing:-0.5}}>Task Detail</div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onToggle}
+            style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${editForm.done?"#34C759":ACC}`,
+              background:editForm.done?"rgba(52,199,89,0.1)":`${ACC}10`,
+              color:editForm.done?"#34C759":ACC,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            {editForm.done?"Undo":"Done"}
+          </button>
+          <button onClick={onDelete}
+            style={{padding:"7px 14px",borderRadius:20,border:"1.5px solid rgba(232,67,147,0.3)",
+              background:"rgba(232,67,147,0.08)",color:"#E84393",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            Delete
+          </button>
+        </div>
+      </div>
+      <Lbl>Title</Lbl>
+      <input value={editForm.text||""} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))}
+        style={{...inputStyle,marginBottom:12,fontSize:17,fontWeight:600}}/>
+      <Lbl>Description</Lbl>
+      <textarea value={editForm.desc||""} onChange={e=>setEditForm(f=>({...f,desc:e.target.value}))}
+        placeholder="Add more context…"
+        style={{...inputStyle,resize:"none",minHeight:80,marginBottom:12,lineHeight:1.5}}/>
+      <Lbl>Notes</Lbl>
+      <textarea value={editForm.notes||""} onChange={e=>setEditForm(f=>({...f,notes:e.target.value}))}
+        placeholder="Links, references, anything…"
+        style={{...inputStyle,resize:"none",minHeight:60,marginBottom:16,lineHeight:1.5}}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div>
+          <Lbl>Area</Lbl>
+          <select value={editForm.area||"inbox"} onChange={e=>setEditForm(f=>({...f,area:e.target.value}))} style={inputStyle}>
+            {areas.map(a=><option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <Lbl>Priority</Lbl>
+          <select value={editForm.priority||"med"} onChange={e=>setEditForm(f=>({...f,priority:e.target.value}))} style={inputStyle}>
+            <option value="high">Urgent</option>
+            <option value="med">Normal</option>
+            <option value="low">Later</option>
+          </select>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        <div>
+          <Lbl>Time</Lbl>
+          <input type="time" value={editForm.time||""} onChange={e=>setEditForm(f=>({...f,time:e.target.value}))} style={inputStyle}/>
+        </div>
+        <div>
+          <Lbl>Duration (min)</Lbl>
+          <input type="number" value={editForm.dur||""} onChange={e=>setEditForm(f=>({...f,dur:+e.target.value}))} style={inputStyle}/>
+        </div>
+      </div>
+      <Lbl>Due date</Lbl>
+      <input type="date" value={editForm.due||""} onChange={e=>setEditForm(f=>({...f,due:e.target.value}))}
+        style={{...inputStyle,marginBottom:24}}/>
+      <button onClick={onSave}
+        style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:ACC,
+          color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>
+        Save changes
+      </button>
+    </Sheet>
+  );
+}
+
+// ── TAB BAR (outside App) ──
+function TabBar({tab, setTab, setView}){
+  return(
+    <div style={tabBarStyle(ACC)}>
+      {[{id:"home",icon:"◉",label:"Areas"},{id:"schedule",icon:"◷",label:"Schedule"},{id:"ai",icon:"✦",label:"AI"}].map(v=>(
+        <button key={v.id} onClick={()=>{setTab(v.id);setView(v.id);}}
+          style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:6,background:"none",border:"none",cursor:"pointer"}}>
+          <span style={{fontSize:22,lineHeight:1,color:tab===v.id?ACC:"#8E8E93"}}>{v.icon}</span>
+          <span style={{fontSize:10,fontWeight:tab===v.id?700:500,color:tab===v.id?ACC:"#8E8E93",letterSpacing:0.3}}>{v.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── TASK ROW (outside App) ──
+function TaskRow({t, showArea, areas, onToggle, onOpen}){
+  return(
+    <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
+      <button onClick={()=>onToggle(t.id)}
+        style={{width:26,height:26,borderRadius:13,
+          border:t.done?"none":`2px solid ${ACC}50`,
+          background:t.done?"#34C759":"transparent",
+          flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        {t.done&&<span style={{color:"#fff",fontSize:13}}>✓</span>}
+      </button>
+      <div style={{flex:1,minWidth:0}} onClick={()=>onOpen(t.id)}>
+        <div style={{fontSize:16,fontWeight:600,color:t.done?"#C7C7CC":"#1C1C1E",
+          textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
+        {t.desc&&!t.done&&<div style={{fontSize:12,color:"#8E8E93",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</div>}
+        <div style={{display:"flex",gap:8,marginTop:3,alignItems:"center",flexWrap:"wrap"}}>
+          {showArea&&<span style={{fontSize:11,fontWeight:600,color:ACC}}>{getArea(areas,t.area).label}</span>}
+          {t.time&&!t.done&&<span style={{fontSize:11,color:"#8E8E93",fontWeight:500}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</span>}
+          {t.priority==="high"&&!t.done&&<span style={{fontSize:11,fontWeight:700,color:"#E84393"}}>Urgent</span>}
+          {t.due&&!t.done&&<span style={{fontSize:11,color:"#8E8E93"}}>Due {t.due}</span>}
+        </div>
+      </div>
+      <span onClick={()=>onOpen(t.id)} style={{color:"#C7C7CC",fontSize:16,cursor:"pointer"}}>›</span>
+    </div>
+  );
+}
+
+// ── SHEET ──
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",display:"flex",alignItems:"flex-end",zIndex:200,backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
