@@ -57,10 +57,47 @@ const WEEK_DAYS = ["S","M","T","W","T","F","S"];
 const TODAY_LONG  = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 
-const AI_SYS = `You are the AI brain of a personal life OS for Elias — Salesforce consultant relocating Austin to Amsterdam, DAFT visa applicant, self-employed. Today: ${TODAY_LONG}.
-Areas: work, amsterdam, health, finances, personal, creative, social, inbox
-Respond ONLY valid JSON no markdown:
-{"summary":"1-2 sentences","tasks":[{"text":"Imperative task","area":"id","priority":"high|med|low","due":"YYYY-MM-DD or empty","time":"HH:MM or empty","dur":30,"notes":"optional"}],"timeline":[{"week":"label","focus":"..."}],"research":"named real services or empty","insight":"one sharp recommendation"}`;
+const AI_SYS = `You are the AI brain of a personal life OS for Elias — Salesforce consultant who just relocated from Austin TX to Amsterdam. DAFT visa applicant, self-employed. Today: ${TODAY_LONG}.
+
+You have access to web search. When the user asks about logistics, shipping, services, costs, routes, or anything requiring current real-world information — USE web search to find real options, real companies, real prices before responding.
+
+Areas available: work, amsterdam, health, finances, personal, creative, social, inbox
+
+Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
+{
+  "summary": "2-3 sentence plain english of what you found and recommend",
+  "research": "Concrete findings: real company names, real price ranges, real timelines. Be specific. If you searched, share what you found.",
+  "insight": "The single most important thing Elias should know or do first",
+  "tasks": [
+    {
+      "text": "Parent task title — imperative, specific",
+      "area": "area_id",
+      "priority": "high|med|low",
+      "due": "YYYY-MM-DD or empty",
+      "time": "HH:MM or empty",
+      "dur": 30,
+      "notes": "key context for this task",
+      "subtasks": [
+        { "text": "Specific actionable subtask" },
+        { "text": "Next step" }
+      ]
+    }
+  ],
+  "timeline": [
+    { "week": "Week 1", "focus": "What to do this week" }
+  ]
+}
+
+Rules:
+- ALWAYS use web search for logistics, shipping, services, costs, local info, current events
+- Subtasks must be specific and sequential — the actual steps to complete the parent task
+- Every task should have 2-6 meaningful subtasks where applicable
+- Be opinionated — recommend the best option, don't just list everything
+- Elias is in Amsterdam now. Austin TX is the origin for any shipping/moving tasks
+- For shipping: research real carriers (uShip, Bikeflights, DSV, Seven Seas, ShipBikes.com etc)
+- For financial/legal tasks in NL: reference real Dutch services
+- Tasks must be actionable today, not vague
+`;
 
 function getArea(areas, id){ return areas.find(a=>a.id===id) || {id:"inbox",label:"Inbox",sub:"",icon:"⊕"}; }
 function t2m(t){ if(!t) return null; const [h,m]=t.split(":").map(Number); return h*60+m; }
@@ -453,15 +490,40 @@ export default function App() {
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1400,system:AI_SYS,
-          messages:[{role:"user",content:aiMode==="email"?`Extract all actions:\n\n${aiInput}`:aiInput}]})
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:2000,
+          system:AI_SYS,
+          tools:[{ type:"web_search_20250305", name:"web_search" }],
+          messages:[{role:"user",content:aiMode==="email"
+            ? `Extract all actions from this email and build tasks with subtasks:\n\n${aiInput}`
+            : `${aiInput}\n\nResearch this thoroughly using web search if needed. Build me tasks with detailed subtasks I can act on immediately.`
+          }]
+        })
       });
       const d=await res.json();
-      const raw=d.content?.find(b=>b.type==="text")?.text||"";
-      const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
+      // extract the final text block (after any tool use)
+      const textBlock = d.content?.filter(b=>b.type==="text").pop();
+      const raw = textBlock?.text||"";
+      const cleaned = raw.replace(/```json|```/g,"").trim();
+      // find JSON object in response
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if(!jsonMatch) throw new Error("No JSON found");
+      const parsed=JSON.parse(jsonMatch[0]);
       setAiResult(parsed);
-      setPending(parsed.tasks.map((t,i)=>({...t,id:uid(),done:false,desc:"",notes:"",subtasks:[],sel:true})));
-    }catch{ setAiErr("Something went wrong. Try again."); }
+      setPending((parsed.tasks||[]).map((t)=>({
+        ...t,
+        id:uid(),
+        done:false,
+        desc:t.notes||"",
+        notes:"",
+        sel:true,
+        subtasks:(t.subtasks||[]).map(s=>({id:uid(),text:s.text||s,done:false}))
+      })));
+    }catch(e){
+      setAiErr("Something went wrong. Try again.");
+      console.error(e);
+    }
     setAiLoad(false);
   }
 
@@ -780,7 +842,7 @@ export default function App() {
                   background:aiLoad||!aiInput.trim()?"rgba(0,0,0,0.07)":ACC,
                   color:aiLoad||!aiInput.trim()?"#8E8E93":"#fff",
                   fontSize:17,fontWeight:700,cursor:aiLoad?"default":"pointer"}}>
-                {aiLoad?"Thinking...":aiMode==="brain"?"Break it down ↗":"Extract tasks ↗"}
+                {aiLoad?"Researching & building tasks...":aiMode==="brain"?"Research & break it down ↗":"Extract tasks ↗"}
               </button>
             </>
           )}
