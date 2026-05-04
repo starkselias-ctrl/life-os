@@ -14,20 +14,41 @@ const DEFAULT_AREAS = [
 ];
 
 const DEFAULT_TASKS = [
-  {id:1,  text:"Finalize Havis Apex routing logic",  area:"work",      done:false,priority:"high",due:"",time:"09:00",dur:90, desc:"",notes:""},
-  {id:2,  text:"Embed Agentforce on Havis website",  area:"work",      done:false,priority:"high",due:"",time:"11:00",dur:60, desc:"",notes:""},
-  {id:3,  text:"Berla flow migration — next phase",  area:"work",      done:false,priority:"med", due:"",time:"14:00",dur:60, desc:"",notes:""},
-  {id:4,  text:"Submit DAFT application",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:""},
-  {id:5,  text:"Sign 12-month lease",                area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:""},
-  {id:6,  text:"Obtain BSN via gemeente",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:45, desc:"",notes:""},
-  {id:7,  text:"Sign up for utilities",              area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:""},
-  {id:8,  text:"Get essentials for apartment",       area:"amsterdam", done:false,priority:"med", due:"",time:"16:00",dur:60, desc:"",notes:""},
-  {id:9,  text:"Decide ZZP vs BV structure",         area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:""},
-  {id:10, text:"Research 30% ruling eligibility",    area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:""},
-  {id:11, text:"Morning workout",                    area:"health",    done:false,priority:"med", due:"",time:"07:00",dur:45, desc:"",notes:""},
-  {id:12, text:"Skincare — set up in new place",     area:"health",    done:false,priority:"low", due:"",time:"",    dur:15, desc:"",notes:""},
-  {id:13, text:"Open Dutch bank account",            area:"finances",  done:false,priority:"high",due:"",time:"10:00",dur:45, desc:"",notes:""},
-  {id:14, text:"Review monthly budget",              area:"finances",  done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:""},
+  {id:1,  text:"Finalize Havis Apex routing logic",  area:"work",      done:false,priority:"high",due:"",time:"09:00",dur:90, desc:"",notes:"",subtasks:[
+    {id:"1a",text:"Write Apex class skeleton",done:false},
+    {id:"1b",text:"Map 21 routing rules",done:false},
+    {id:"1c",text:"Test across 5 queues",done:false},
+  ]},
+  {id:2,  text:"Embed Agentforce on Havis website",  area:"work",      done:false,priority:"high",due:"",time:"11:00",dur:60, desc:"",notes:"",subtasks:[]},
+  {id:3,  text:"Berla flow migration — next phase",  area:"work",      done:false,priority:"med", due:"",time:"14:00",dur:60, desc:"",notes:"",subtasks:[]},
+  {id:4,  text:"Submit DAFT application",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[
+    {id:"4a",text:"Complete form 7524",done:false},
+    {id:"4b",text:"Attach appendix 7601",done:false},
+    {id:"4c",text:"Attach appendix 7675",done:false},
+    {id:"4d",text:"Submit to IND",done:false},
+  ]},
+  {id:5,  text:"Sign 12-month lease",                area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
+  {id:6,  text:"Obtain BSN via gemeente",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:45, desc:"",notes:"",subtasks:[
+    {id:"6a",text:"Book gemeente appointment",done:false},
+    {id:"6b",text:"Bring passport + proof of address",done:false},
+    {id:"6c",text:"Collect BSN number",done:false},
+  ]},
+  {id:7,  text:"Sign up for utilities",              area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:"",subtasks:[]},
+  {id:8,  text:"Get essentials for apartment",       area:"amsterdam", done:false,priority:"med", due:"",time:"16:00",dur:60, desc:"",notes:"",subtasks:[
+    {id:"8a",text:"Bedding & pillows",done:false},
+    {id:"8b",text:"Kitchen basics",done:false},
+    {id:"8c",text:"Bathroom supplies",done:false},
+  ]},
+  {id:9,  text:"Decide ZZP vs BV structure",         area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
+  {id:10, text:"Research 30% ruling eligibility",    area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:"",subtasks:[]},
+  {id:11, text:"Morning workout",                    area:"health",    done:false,priority:"med", due:"",time:"07:00",dur:45, desc:"",notes:"",subtasks:[]},
+  {id:12, text:"Skincare — set up in new place",     area:"health",    done:false,priority:"low", due:"",time:"",    dur:15, desc:"",notes:"",subtasks:[]},
+  {id:13, text:"Open Dutch bank account",            area:"finances",  done:false,priority:"high",due:"",time:"10:00",dur:45, desc:"",notes:"",subtasks:[
+    {id:"13a",text:"Research Bunq vs Revolut vs ING",done:false},
+    {id:"13b",text:"Gather required documents",done:false},
+    {id:"13c",text:"Submit application",done:false},
+  ]},
+  {id:14, text:"Review monthly budget",              area:"finances",  done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
 ];
 
 const ICONS = ["⌘","✈","◎","$","⊙","✦","◈","⊕","♡","★","◆","▲","●","◐","⬡","⚡","✿","☀","♫","⚙","✎","⊞","⊟","⊠"];
@@ -104,6 +125,9 @@ function TabBar({ tab, setTab, setView }) {
 }
 
 function TaskRow({ t, areas, onToggle, onOpen }) {
+  const subs     = t.subtasks||[];
+  const subDone  = subs.filter(s=>s.done).length;
+  const hasSubs  = subs.length>0;
   return (
     <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
       <button onClick={()=>onToggle(t.id)}
@@ -118,11 +142,21 @@ function TaskRow({ t, areas, onToggle, onOpen }) {
         {t.desc && !t.done && (
           <div style={{fontSize:12,color:"#8E8E93",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</div>
         )}
-        <div style={{display:"flex",gap:8,marginTop:3,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:8,marginTop:4,alignItems:"center",flexWrap:"wrap"}}>
           {t.time && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</span>}
           {t.priority==="high" && !t.done && <span style={{fontSize:11,fontWeight:700,color:"#E84393"}}>Urgent</span>}
           {t.due && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>Due {t.due}</span>}
+          {hasSubs && !t.done && (
+            <span style={{fontSize:11,color:subDone===subs.length?"#34C759":ACC,fontWeight:600}}>
+              ◎ {subDone}/{subs.length} subtasks
+            </span>
+          )}
         </div>
+        {hasSubs && !t.done && (
+          <div style={{marginTop:6,height:2,borderRadius:1,background:"rgba(0,0,0,0.07)",overflow:"hidden"}}>
+            <div style={{height:2,borderRadius:1,background:subDone===subs.length?"#34C759":ACC,width:`${subs.length?subDone/subs.length*100:0}%`,transition:"width 0.3s"}}/>
+          </div>
+        )}
       </div>
       <span onClick={()=>onOpen(t.id)} style={{color:"#C7C7CC",fontSize:16,cursor:"pointer"}}>›</span>
     </div>
@@ -130,7 +164,24 @@ function TaskRow({ t, areas, onToggle, onOpen }) {
 }
 
 function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onDelete, onSave, onClose }) {
+  const [newSub, setNewSub] = useState("");
   if (!detailId || !editForm) return null;
+
+  const subtasks = editForm.subtasks || [];
+  const subDone  = subtasks.filter(s=>s.done).length;
+
+  function toggleSub(sid){
+    setEditForm(f=>({...f, subtasks:f.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}));
+  }
+  function deleteSub(sid){
+    setEditForm(f=>({...f, subtasks:f.subtasks.filter(s=>s.id!==sid)}));
+  }
+  function addSub(){
+    if(!newSub.trim()) return;
+    setEditForm(f=>({...f, subtasks:[...f.subtasks,{id:uid(),text:newSub.trim(),done:false}]}));
+    setNewSub("");
+  }
+
   return (
     <Sheet onClose={onClose} tall>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -149,17 +200,55 @@ function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onD
           </button>
         </div>
       </div>
+
       <Lbl>Title</Lbl>
       <input value={editForm.text||""} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))}
         style={{...IS,marginBottom:12,fontSize:17,fontWeight:600}}/>
+
       <Lbl>Description</Lbl>
       <textarea value={editForm.desc||""} onChange={e=>setEditForm(f=>({...f,desc:e.target.value}))}
         placeholder="Add more context…"
-        style={{...IS,resize:"none",minHeight:80,marginBottom:12,lineHeight:1.5}}/>
+        style={{...IS,resize:"none",minHeight:72,marginBottom:12,lineHeight:1.5}}/>
+
       <Lbl>Notes</Lbl>
       <textarea value={editForm.notes||""} onChange={e=>setEditForm(f=>({...f,notes:e.target.value}))}
         placeholder="Links, references, anything…"
-        style={{...IS,resize:"none",minHeight:60,marginBottom:16,lineHeight:1.5}}/>
+        style={{...IS,resize:"none",minHeight:52,marginBottom:16,lineHeight:1.5}}/>
+
+      {/* Subtasks */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <Lbl>Subtasks {subtasks.length>0?`(${subDone}/${subtasks.length})`:""}</Lbl>
+      </div>
+      {subtasks.length>0 && (
+        <div style={{background:"rgba(255,255,255,0.7)",borderRadius:14,overflow:"hidden",marginBottom:10,border:"1px solid rgba(255,255,255,0.7)"}}>
+          {subtasks.map((s,i)=>(
+            <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<subtasks.length-1?"1px solid rgba(0,0,0,0.05)":"none"}}>
+              <button onClick={()=>toggleSub(s.id)}
+                style={{width:22,height:22,borderRadius:11,border:s.done?"none":`2px solid ${ACC}40`,
+                  background:s.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {s.done && <span style={{color:"#fff",fontSize:11}}>✓</span>}
+              </button>
+              <div style={{flex:1,fontSize:14,color:s.done?"#C7C7CC":"#1C1C1E",textDecoration:s.done?"line-through":"none",lineHeight:1.3}}>{s.text}</div>
+              <button onClick={()=>deleteSub(s.id)} style={{background:"none",border:"none",color:"#D1D1D6",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Add subtask */}
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        <input value={newSub} onChange={e=>setNewSub(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&addSub()}
+          placeholder="Add a subtask…"
+          style={{...IS,flex:1,padding:"11px 14px",fontSize:14}}/>
+        <button onClick={addSub} disabled={!newSub.trim()}
+          style={{padding:"11px 16px",borderRadius:14,border:"none",
+            background:newSub.trim()?ACC:"rgba(0,0,0,0.06)",
+            color:newSub.trim()?"#fff":"#8E8E93",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+          Add
+        </button>
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
         <div>
           <Lbl>Area</Lbl>
@@ -289,7 +378,7 @@ export default function App() {
 
   function addManual(){
     if(!newT.text.trim()) return;
-    setTasks(ts=>[...ts,{...newT,id:uid(),done:false}]);
+    setTasks(ts=>[...ts,{...newT,id:uid(),done:false,subtasks:[]}]);
     setNewT({text:"",area:activeArea||"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
     setView(activeArea?"area":"home");
   }
@@ -326,7 +415,7 @@ export default function App() {
       const raw=d.content?.find(b=>b.type==="text")?.text||"";
       const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
       setAiResult(parsed);
-      setPending(parsed.tasks.map((t,i)=>({...t,id:uid(),done:false,desc:"",notes:"",sel:true})));
+      setPending(parsed.tasks.map((t,i)=>({...t,id:uid(),done:false,desc:"",notes:"",subtasks:[],sel:true})));
     }catch{ setAiErr("Something went wrong. Try again."); }
     setAiLoad(false);
   }
