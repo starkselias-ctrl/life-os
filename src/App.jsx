@@ -124,41 +124,76 @@ function TabBar({ tab, setTab, setView }) {
   );
 }
 
-function TaskRow({ t, areas, onToggle, onOpen }) {
-  const subs     = t.subtasks||[];
-  const subDone  = subs.filter(s=>s.done).length;
-  const hasSubs  = subs.length>0;
+function TaskRow({ t, areas, onToggle, onOpen, onToggleSub }) {
+  const [expanded, setExpanded] = useState(false);
+  const subs    = t.subtasks||[];
+  const subDone = subs.filter(s=>s.done).length;
+  const hasSubs = subs.length>0;
   return (
-    <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
-      <button onClick={()=>onToggle(t.id)}
-        style={{width:26,height:26,borderRadius:13,border:t.done?"none":`2px solid ${ACC}50`,
-          background:t.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",
-          display:"flex",alignItems:"center",justifyContent:"center"}}>
-        {t.done && <span style={{color:"#fff",fontSize:13}}>✓</span>}
-      </button>
-      <div style={{flex:1,minWidth:0}} onClick={()=>onOpen(t.id)}>
-        <div style={{fontSize:16,fontWeight:600,color:t.done?"#C7C7CC":"#1C1C1E",
-          textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
-        {t.desc && !t.done && (
-          <div style={{fontSize:12,color:"#8E8E93",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</div>
-        )}
-        <div style={{display:"flex",gap:8,marginTop:4,alignItems:"center",flexWrap:"wrap"}}>
-          {t.time && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</span>}
-          {t.priority==="high" && !t.done && <span style={{fontSize:11,fontWeight:700,color:"#E84393"}}>Urgent</span>}
-          {t.due && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>Due {t.due}</span>}
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
+        <button onClick={()=>onToggle(t.id)}
+          style={{width:26,height:26,borderRadius:13,border:t.done?"none":`2px solid ${ACC}50`,
+            background:t.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",
+            display:"flex",alignItems:"center",justifyContent:"center"}}>
+          {t.done && <span style={{color:"#fff",fontSize:13}}>✓</span>}
+        </button>
+        <div style={{flex:1,minWidth:0}} onClick={()=>onOpen(t.id)}>
+          <div style={{fontSize:16,fontWeight:600,color:t.done?"#C7C7CC":"#1C1C1E",
+            textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
+          {t.desc && !t.done && (
+            <div style={{fontSize:12,color:"#8E8E93",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.desc}</div>
+          )}
+          <div style={{display:"flex",gap:8,marginTop:4,alignItems:"center",flexWrap:"wrap"}}>
+            {t.time && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</span>}
+            {t.priority==="high" && !t.done && <span style={{fontSize:11,fontWeight:700,color:"#E84393"}}>Urgent</span>}
+            {t.due && !t.done && <span style={{fontSize:11,color:"#8E8E93"}}>Due {t.due}</span>}
+          </div>
           {hasSubs && !t.done && (
-            <span style={{fontSize:11,color:subDone===subs.length?"#34C759":ACC,fontWeight:600}}>
-              ◎ {subDone}/{subs.length} subtasks
-            </span>
+            <div style={{marginTop:6,height:2,borderRadius:1,background:"rgba(0,0,0,0.07)"}}>
+              <div style={{height:2,borderRadius:1,transition:"width 0.3s",
+                background:subDone===subs.length?"#34C759":ACC,
+                width:`${subs.length?subDone/subs.length*100:0}%`}}/>
+            </div>
           )}
         </div>
-        {hasSubs && !t.done && (
-          <div style={{marginTop:6,height:2,borderRadius:1,background:"rgba(0,0,0,0.07)",overflow:"hidden"}}>
-            <div style={{height:2,borderRadius:1,background:subDone===subs.length?"#34C759":ACC,width:`${subs.length?subDone/subs.length*100:0}%`,transition:"width 0.3s"}}/>
-          </div>
-        )}
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          {hasSubs && !t.done && (
+            <button onClick={e=>{e.stopPropagation();setExpanded(x=>!x);}}
+              style={{background:"none",border:"none",cursor:"pointer",fontSize:11,fontWeight:600,
+                color:ACC,padding:"4px 6px",borderRadius:8,display:"flex",alignItems:"center",gap:3}}>
+              <span style={{fontSize:10}}>{subDone}/{subs.length}</span>
+              <span style={{fontSize:12,transition:"transform 0.2s",display:"inline-block",transform:expanded?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+            </button>
+          )}
+          <span onClick={()=>onOpen(t.id)} style={{color:"#C7C7CC",fontSize:16,cursor:"pointer"}}>›</span>
+        </div>
       </div>
-      <span onClick={()=>onOpen(t.id)} style={{color:"#C7C7CC",fontSize:16,cursor:"pointer"}}>›</span>
+      {/* Subtask dropdown */}
+      {hasSubs && expanded && !t.done && (
+        <div style={{marginLeft:58,marginRight:18,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${ACC}20`,background:`${ACC}06`}}>
+          {subs.map((s,i)=>(
+            <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",
+              borderBottom:i<subs.length-1?"1px solid rgba(0,0,0,0.05)":"none"}}>
+              <button onClick={()=>onToggleSub(t.id,s.id)}
+                style={{width:20,height:20,borderRadius:10,
+                  border:s.done?"none":`1.5px solid ${ACC}60`,
+                  background:s.done?"#34C759":"transparent",
+                  flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {s.done && <span style={{color:"#fff",fontSize:10}}>✓</span>}
+              </button>
+              <span style={{fontSize:14,color:s.done?"#C7C7CC":"#3C3C43",
+                textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
+            </div>
+          ))}
+          <button onClick={()=>onOpen(t.id)}
+            style={{width:"100%",padding:"10px 14px",background:"none",border:"none",
+              borderTop:"1px solid rgba(0,0,0,0.05)",cursor:"pointer",
+              fontSize:12,fontWeight:600,color:ACC,textAlign:"left"}}>
+            + Add subtask / Edit →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -358,11 +393,21 @@ export default function App() {
   const [aiErr,    setAiErr]    = useState("");
   const [pending,  setPending]  = useState([]);
 
+  // migrate old tasks that lack subtasks field
+  useEffect(()=>{
+    setTasks(ts=>ts.map(t=>({subtasks:[],...t})));
+  },[]);
   useEffect(()=>save("los_areas",areas),[areas]);
   useEffect(()=>save("los_tasks",tasks),[tasks]);
 
   function toggle(id){ setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)); }
   function delTask(id){ setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null); }
+  function toggleSub(taskId, subId){
+    setTasks(ts=>ts.map(t=>t.id===taskId
+      ? {...t, subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,done:!s.done}:s)}
+      : t
+    ));
+  }
 
   function openDetail(id){
     const t=tasks.find(x=>x.id===id);
@@ -591,7 +636,7 @@ export default function App() {
               <div style={{...gl(0.8),borderRadius:20,overflow:"hidden",marginBottom:10}}>
                 {open.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail}/>
+                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
                     {i<open.length-1 && <div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
@@ -611,7 +656,7 @@ export default function App() {
                 </button>
                 {showDone && done.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail}/>
+                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
                     {i<done.length-1 && <div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
