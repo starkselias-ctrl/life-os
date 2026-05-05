@@ -99,15 +99,17 @@ Respond ONLY with valid JSON, no markdown, no explanation outside the JSON:
 
 Rules:
 - ALWAYS use web search for logistics, shipping, services, costs, local info, current events
+- ONE goal = ONE parent task. If the user asks about one thing (e.g. shipping a bike), produce a single parent task with 4-8 sequential subtasks covering every step. Only create multiple parent tasks when there are genuinely separate, independent goals.
 - Subtasks must be specific and sequential — the actual steps to complete the parent task
-- Every task should have 2-6 meaningful subtasks where applicable
-- Be opinionated — recommend the best option, don't just list everything
+- Be opinionated — recommend the best option with the reason, don't just list everything
 - Elias is in Amsterdam now. Austin TX is the origin for any shipping/moving tasks
 - For shipping: research real carriers (uShip, Bikeflights, DSV, Seven Seas, ShipBikes.com etc)
 - For financial/legal tasks in NL: reference real Dutch services
 - Tasks must be actionable today, not vague
+- summary, research, insight fields must be plain text only — no HTML, no markdown, no citation tags
 `;
 
+function stripTags(s){ return s ? s.replace(/<[^>]*>/g,"").replace(/\s+/g," ").trim() : ""; }
 function getArea(areas, id){ return areas.find(a=>a.id===id) || {id:"inbox",label:"Inbox",sub:"",icon:"⊕"}; }
 function t2m(t){ if(!t) return null; const [h,m]=t.split(":").map(Number); return h*60+m; }
 function fmt(t){ if(!t) return ""; const [h,m]=t.split(":").map(Number); return `${h%12||12}:${String(m).padStart(2,"0")} ${h>=12?"PM":"AM"}`; }
@@ -911,9 +913,9 @@ export default function App() {
           )}
           {aiResult && (
             <div>
-              <div style={{...gl(0.75),borderRadius:16,padding:"14px 16px",marginBottom:12,fontSize:15,color:"#3C3C43",lineHeight:1.6}}>{aiResult.summary}</div>
-              {aiResult.research && <InfoCard color="#FF9F0A" label="Options found" text={aiResult.research} bg="rgba(255,159,10,0.1)" border="rgba(255,159,10,0.2)"/>}
-              {aiResult.insight  && <InfoCard color={ACC} label="Key insight" text={aiResult.insight} bg={`${ACC}10`} border={`${ACC}28`}/>}
+              <div style={{...gl(0.75),borderRadius:16,padding:"14px 16px",marginBottom:12,fontSize:15,color:"#3C3C43",lineHeight:1.6}}>{stripTags(aiResult.summary)}</div>
+              {aiResult.research && <InfoCard color="#FF9F0A" label="Options found" text={stripTags(aiResult.research)} bg="rgba(255,159,10,0.1)" border="rgba(255,159,10,0.2)"/>}
+              {aiResult.insight  && <InfoCard color={ACC} label="Key insight" text={stripTags(aiResult.insight)} bg={`${ACC}10`} border={`${ACC}28`}/>}
               {aiResult.timeline?.length>0 && (
                 <div style={{...gl(0.7),borderRadius:16,padding:"14px 16px",marginBottom:12}}>
                   <Lbl>Timeline</Lbl>
