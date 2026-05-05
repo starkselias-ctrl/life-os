@@ -30,7 +30,14 @@ const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month
 const today       = new Date();
 
 const CARD_COLORS = ["#2B6AFF","#E84393","#F5A623","#00B894","#FF6348","#A855F7","#0EA5E9","#636370"];
-function greet(){ const h=new Date().getHours(); return h<12?"Good morning":h<17?"Good afternoon":"Good evening"; }
+function greet(){
+  const now=new Date(), h=now.getHours(), day=now.getDay();
+  const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  if(day===0||day===6) return `Happy ${days[day]}`;
+  if(day===5) return h>=12?"TGIF":"Happy Friday";
+  if(day===1&&h<12) return "Happy Monday";
+  return h<12?"Good morning":h<17?"Good afternoon":"Good evening";
+}
 
 const EC = [
   {bg:"rgba(255,200,80,0.18)",border:"#F5A623"},
@@ -892,6 +899,8 @@ export default function App() {
 
   // ── Clerk auth ──
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useAuth();
+  const { user } = useUser();
+  const displayName = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "";
   const [syncEnabled,   setSyncEnabled]   = useState(false);
   const [showProfile,   setShowProfile]   = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
@@ -1137,7 +1146,7 @@ export default function App() {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
             <div>
               <div style={{fontSize:13,color:T2,marginBottom:2}}>{TODAY_SHORT}</div>
-              <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}, Elias.</div>
+              <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}{displayName?`, ${displayName}.`:`.`}</div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <button onClick={()=>setShowProfile(true)}
