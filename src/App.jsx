@@ -577,6 +577,12 @@ export default function App() {
         })
       });
       const d=await res.json();
+      if(!res.ok){
+        const msg=d?.error?.message||`API error ${res.status}`;
+        if(res.status===429) throw new Error("Rate limit or no credits — add billing at console.anthropic.com");
+        if(res.status===401) throw new Error("Invalid API key — check VITE_ANTHROPIC_KEY");
+        throw new Error(msg);
+      }
       const textBlock=d.content?.filter(b=>b.type==="text").pop();
       const raw=textBlock?.text||"";
       const cleaned=raw.replace(/```json|```/g,"").trim();
@@ -589,7 +595,7 @@ export default function App() {
         subtasks:(t.subtasks||[]).map(s=>({id:uid(),text:s.text||s,done:false}))
       })));
     }catch(e){
-      setAiErr("Something went wrong. Try again.");
+      setAiErr(e.message||"Something went wrong. Try again.");
       console.error(e);
     }
     setAiLoad(false);
@@ -865,20 +871,43 @@ export default function App() {
               </button>
             ))}
           </div>
-          {!aiResult && (
+          {!aiResult && !aiLoad && (
             <>
               <textarea autoFocus value={aiInput} onChange={e=>setAiInput(e.target.value)}
                 placeholder={aiMode==="brain"?"Type anything — a goal, problem, brain dump…":"Paste full email here…"}
                 style={{...IS,resize:"none",minHeight:aiMode==="email"?180:130,marginBottom:12,lineHeight:1.5}}/>
-              {aiErr && <div style={{fontSize:13,color:"#E84393",marginBottom:8,fontWeight:500}}>{aiErr}</div>}
-              <button onClick={runAI} disabled={aiLoad||!aiInput.trim()}
+              {aiErr && (
+                <div style={{...gl(0.85),borderRadius:16,padding:"16px",marginBottom:12,border:"1px solid rgba(232,67,147,0.3)",background:"rgba(232,67,147,0.07)"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:"#E84393",marginBottom:6}}>Something went wrong</div>
+                  <div style={{fontSize:13,color:"#3C3C43",lineHeight:1.5,marginBottom:12}}>{aiErr}</div>
+                  <button onClick={()=>setAiErr("")}
+                    style={{padding:"8px 16px",borderRadius:10,border:"none",background:"rgba(232,67,147,0.12)",color:"#E84393",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              <button onClick={runAI} disabled={!aiInput.trim()}
                 style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
-                  background:aiLoad||!aiInput.trim()?"rgba(0,0,0,0.07)":ACC,
-                  color:aiLoad||!aiInput.trim()?"#8E8E93":"#fff",
-                  fontSize:17,fontWeight:700,cursor:aiLoad?"default":"pointer"}}>
-                {aiLoad?"Researching & building tasks...":aiMode==="brain"?"Research & break it down ↗":"Extract tasks ↗"}
+                  background:!aiInput.trim()?"rgba(0,0,0,0.07)":ACC,
+                  color:!aiInput.trim()?"#8E8E93":"#fff",
+                  fontSize:17,fontWeight:700,cursor:"pointer"}}>
+                {aiMode==="brain"?"Research & break it down ↗":"Extract tasks ↗"}
               </button>
             </>
+          )}
+          {aiLoad && (
+            <div style={{...gl(0.85),borderRadius:20,padding:"36px 24px",textAlign:"center",marginBottom:12}}>
+              <div className="ai-spinner" style={{margin:"0 auto 20px"}}/>
+              <div style={{fontSize:17,fontWeight:700,color:"#1C1C1E",marginBottom:6}}>Working on it…</div>
+              <div style={{fontSize:13,color:"#8E8E93",marginBottom:20,lineHeight:1.5}}>
+                Searching the web and building<br/>your tasks with subtasks
+              </div>
+              <div style={{display:"flex",justifyContent:"center",gap:8}}>
+                <div className="ai-dot"/>
+                <div className="ai-dot"/>
+                <div className="ai-dot"/>
+              </div>
+            </div>
           )}
           {aiResult && (
             <div>
