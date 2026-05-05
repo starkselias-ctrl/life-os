@@ -32,7 +32,6 @@ const ICONS = ["⌘","✈","◎","$","⊙","✦","◈","⊕","♡","★","◆","
 const PRI = { high:{label:"Urgent",color:PINK}, med:{label:"Normal",color:ACC}, low:{label:"Later",color:"#636370"} };
 const WEEK_DAYS = ["S","M","T","W","T","F","S"];
 const TODAY_LONG  = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
-const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 const today       = new Date();
 
 // Area card themes — tint bg + matching accent
@@ -982,6 +981,86 @@ function ProfileSheet({ onClose, onChangePw, onSignOut }) {
 }
 
 // ─────────────────────────────────────────
+// SUBTASK MODAL
+// ─────────────────────────────────────────
+function SubtaskModal({ initial, onAdd, onClose }) {
+  const [text, setText] = useState(initial||"");
+  const [dur,  setDur]  = useState(30);
+  const [time, setTime] = useState("");
+  const [due,  setDue]  = useState("");
+  const [showTime, setShowTime] = useState(false);
+  const [showDue,  setShowDue]  = useState(false);
+
+  function confirm() {
+    if(!text.trim()) return;
+    onAdd({ id:uid(), text:text.trim(), done:false, dur:dur||30,
+      time:showTime?time:"", due:showDue?due:"" });
+    onClose();
+  }
+
+  return (
+    <Sheet onClose={onClose}>
+      <div style={{fontSize:17,fontWeight:700,color:T1,marginBottom:20}}>Add subtask</div>
+
+      <Lbl>Subtask</Lbl>
+      <input value={text} onChange={e=>setText(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&confirm()} autoFocus
+        placeholder="What needs to be done?"
+        style={{...IS,marginBottom:16,fontSize:15}}/>
+
+      <Lbl>Duration (min)</Lbl>
+      <input type="number" value={dur} onChange={e=>setDur(+e.target.value)} placeholder="30"
+        style={{...IS,marginBottom:16}}/>
+
+      {showTime ? (
+        <>
+          <Lbl>Time</Lbl>
+          <input type="time" value={time} onChange={e=>setTime(e.target.value)}
+            style={{...IS,marginBottom:8}}/>
+          <button onClick={()=>{setShowTime(false);setTime("");}}
+            style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:14,padding:0}}>
+            Remove time
+          </button>
+        </>
+      ) : (
+        <button onClick={()=>setShowTime(true)}
+          style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+            background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+            width:"100%",textAlign:"left",marginBottom:10}}>
+          + Schedule a time
+        </button>
+      )}
+
+      {showDue ? (
+        <>
+          <Lbl>Due date</Lbl>
+          <input type="date" value={due} onChange={e=>setDue(e.target.value)}
+            style={{...IS,marginBottom:8}}/>
+          <button onClick={()=>{setShowDue(false);setDue("");}}
+            style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:20,padding:0}}>
+            Remove due date
+          </button>
+        </>
+      ) : (
+        <button onClick={()=>setShowDue(true)}
+          style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+            background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+            width:"100%",textAlign:"left",marginBottom:20}}>
+          + Add due date
+        </button>
+      )}
+
+      <button onClick={confirm} disabled={!text.trim()}
+        style={{width:"100%",padding:"15px",borderRadius:14,border:"none",
+          background:text.trim()?ACC:"rgba(255,255,255,0.08)",
+          color:text.trim()?"#fff":T2,fontSize:15,fontWeight:700,cursor:"pointer"}}>
+        Add subtask
+      </button>
+    </Sheet>
+  );
+}
+
+// ─────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────
 export default function App() {
@@ -1022,6 +1101,9 @@ export default function App() {
   const [subTimeEditId,  setSubTimeEditId]  = useState(null);
   const [newTShowTime,   setNewTShowTime]   = useState(false);
   const [newTShowDue,    setNewTShowDue]    = useState(false);
+  const [schedDate,      setSchedDate]      = useState(()=>new Date());
+  const [schedViewMode,  setSchedViewMode]  = useState("day"); // "day" | "month"
+  const [subModal,       setSubModal]       = useState({open:false,text:"",dur:30,time:"",due:"",ctx:"detail"});
   const [showBrainDump, setShowBrainDump] = useState(false);
 
   // ── Focus timer ──
@@ -1281,20 +1363,6 @@ export default function App() {
   const scheduled = useMemo(()=>[...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time)),[tasks]);
   const weekDates = useMemo(()=>Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()-today.getDay()+i); return d; }),[]);
 
-  // Schedule view items: tasks with time + scheduled subtasks
-  const scheduledAll = useMemo(()=>{
-    const items=[];
-    for(const t of tasks){
-      if(t.time&&!t.done) items.push({...t,_type:"task"});
-      for(const s of (t.subtasks||[])){
-        if(s.time&&!s.done) items.push({
-          ...s,dur:s.dur||30,_type:"subtask",
-          _parentId:t.id,_parentText:t.text,_area:t.area,
-        });
-      }
-    }
-    return items.sort((a,b)=>t2m(a.time)-t2m(b.time));
-  },[tasks]);
 
   const detailToggle = useCallback(()=>{ toggle(detailId); closeDetail(); },[detailId,toggle,closeDetail]);
   const detailDelete = useCallback(()=>delTask(detailId),[detailId,delTask]);
@@ -1667,29 +1735,25 @@ export default function App() {
                 )}
               </div>
             ))}
-            {/* Add subtask input */}
+            {/* Add subtask — opens modal */}
             <div style={{display:"flex",gap:8,marginTop:8}}>
               <input value={newSubText} onChange={e=>setNewSubText(e.target.value)}
-                onKeyDown={e=>{
-                  if(e.key==="Enter"&&newSubText.trim()){
-                    setEditForm(f=>({...f,subtasks:[...f.subtasks,{id:uid(),text:newSubText.trim(),done:false}]}));
-                    setNewSubText("");
-                  }
-                }}
+                onKeyDown={e=>{ if(e.key==="Enter") setSubModal({open:true,text:newSubText,ctx:"detail"}); }}
                 placeholder="Add a subtask…"
                 style={{...IS,flex:1,padding:"9px 12px",fontSize:13}}/>
-              <button onClick={()=>{
-                  if(!newSubText.trim()) return;
-                  setEditForm(f=>({...f,subtasks:[...f.subtasks,{id:uid(),text:newSubText.trim(),done:false}]}));
-                  setNewSubText("");
-                }}
-                disabled={!newSubText.trim()}
+              <button onClick={()=>setSubModal({open:true,text:newSubText,ctx:"detail"})}
                 style={{padding:"9px 14px",borderRadius:12,border:"none",
-                  background:newSubText.trim()?ACC:"rgba(255,255,255,0.06)",
-                  color:newSubText.trim()?"#fff":T2,fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+                  background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
                 Add
               </button>
             </div>
+            {subModal.open&&subModal.ctx==="detail"&&(
+              <SubtaskModal
+                initial={subModal.text}
+                onClose={()=>{ setSubModal(s=>({...s,open:false})); setNewSubText(""); }}
+                onAdd={sub=>{ setEditForm(f=>({...f,subtasks:[...f.subtasks,sub]})); setNewSubText(""); }}
+              />
+            )}
           </div>
 
           {/* Description + Notes */}
@@ -1979,79 +2043,222 @@ export default function App() {
   // SCHEDULE
   // ══════════════════════════════════
   if(view==="schedule") {
+    const sdStr    = schedDate.toLocaleDateString("en-CA"); // YYYY-MM-DD
+    const isToday  = schedDate.toDateString()===today.toDateString();
+    const sdLabel  = schedDate.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+    function moveDay(n){ setSchedDate(d=>{ const nd=new Date(d); nd.setDate(nd.getDate()+n); return nd; }); }
+    function moveMon(n){ setSchedDate(d=>{ const nd=new Date(d); nd.setMonth(nd.getMonth()+n); return nd; }); }
+
+    // Day view items: timed tasks/subtasks matching the selected date
     const HOURS=Array.from({length:17},(_,i)=>i+6);
     const DS=6*60,DE=22*60,PX=1.55,TH=(DE-DS)*PX;
-    const n=new Date(),nm=n.getHours()*60+n.getMinutes();
-    const np=(nm>=DS&&nm<=DE)?(nm-DS)*PX:null;
+    const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+    const np=(isToday&&nm>=DS&&nm<=DE)?(nm-DS)*PX:null;
+    const dayItems=[];
+    for(const t of tasks){
+      if(t.time&&!t.done&&(t.due===sdStr||(!t.due&&isToday)))
+        dayItems.push({...t,_type:"task"});
+      for(const s of (t.subtasks||[])){
+        if(s.time&&!s.done&&(s.due===sdStr||(!s.due&&isToday)))
+          dayItems.push({...s,dur:s.dur||30,_type:"subtask",_parentId:t.id,_parentText:t.text});
+      }
+    }
+    dayItems.sort((a,b)=>t2m(a.time)-t2m(b.time));
+
+    // Month view helpers
+    const yr=schedDate.getFullYear(), mo=schedDate.getMonth();
+    const firstWD=new Date(yr,mo,1).getDay();
+    const daysInMo=new Date(yr,mo+1,0).getDate();
+    const monthCells=Array.from({length:firstWD+daysInMo},(_,i)=>
+      i<firstWD?null:new Date(yr,mo,i-firstWD+1)
+    );
+    const weeks=[];
+    for(let i=0;i<monthCells.length;i+=7) weeks.push(monthCells.slice(i,i+7));
+    // Dot counts per day
+    const tasksByDate={};
+    for(const t of tasks){
+      if(t.due) tasksByDate[t.due]=(tasksByDate[t.due]||0)+1;
+    }
+
     return (
       <div style={PAGE}>
         <div style={{position:"relative",zIndex:1,paddingBottom:110}}>
           <div style={{padding:"52px 20px 16px"}}>
-            <div style={{fontSize:12,fontWeight:600,color:T2,letterSpacing:1.2,textTransform:"uppercase",marginBottom:4}}>{TODAY_SHORT}</div>
-            <div style={{fontSize:34,fontWeight:800,color:T1,letterSpacing:-1,marginBottom:16}}>Schedule</div>
-            <div style={{...gl(),borderRadius:18,padding:"12px 8px",display:"flex",marginBottom:20}}>
-              {weekDates.map((d,i)=>{
-                const isTd=d.toDateString()===today.toDateString();
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    <div style={{fontSize:10,fontWeight:600,color:T2,textTransform:"uppercase"}}>{WEEK_DAYS[d.getDay()]}</div>
-                    <div style={{width:32,height:32,borderRadius:16,background:isTd?ACC:"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      <span style={{fontSize:15,fontWeight:isTd?700:500,color:isTd?"#fff":d.getDay()===0||d.getDay()===6?"rgba(255,255,255,0.25)":T1}}>{d.getDate()}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div style={{padding:"0 20px"}}>
-            <div style={{...gl(),borderRadius:20,padding:"16px 0 16px 16px",overflow:"hidden"}}>
-              <div style={{display:"flex",gap:4}}>
-                <div style={{width:52,flexShrink:0,position:"relative",height:TH}}>
-                  {HOURS.map(h=>(
-                    <div key={h} style={{position:"absolute",top:(h*60-DS)*PX-6,fontSize:11,fontWeight:500,color:T2,textAlign:"right",width:48,lineHeight:1}}>
-                      {h===12?"noon":h<12?`${h}am`:`${h-12}pm`}
-                    </div>
-                  ))}
-                </div>
-                <div style={{flex:1,position:"relative",height:TH,marginRight:16}}>
-                  {HOURS.map(h=>(<div key={h} style={{position:"absolute",top:(h*60-DS)*PX,left:0,right:0,height:0.5,background:"rgba(255,255,255,0.07)"}}/>))}
-                  {np!==null && (
-                    <div style={{position:"absolute",top:np,left:0,right:0,zIndex:5,display:"flex",alignItems:"center"}}>
-                      <div style={{width:9,height:9,borderRadius:5,background:ACC,marginLeft:-4,flexShrink:0,border:"2px solid #0D0D0F"}}/>
-                      <div style={{flex:1,height:1.5,background:ACC}}/>
-                    </div>
-                  )}
-                  {scheduledAll.map((item,idx)=>{
-                    const top=(t2m(item.time)-DS)*PX;
-                    const h=Math.max((item.dur||30)*PX,item._type==="subtask"?38:44);
-                    const ec=EC[idx%EC.length];
-                    const endMin=t2m(item.time)+(item.dur||30);
-                    const endStr=`${Math.floor(endMin/60)}:${String(endMin%60).padStart(2,"0")}`;
-                    const isSub=item._type==="subtask";
-                    return (
-                      <div key={item.id}
-                        onClick={()=>openDetail(isSub?item._parentId:item.id)}
-                        style={{position:"absolute",top,left:isSub?10:0,right:0,height:h,
-                          background:isSub?"#2A1A05":ec.bg,
-                          borderLeft:`3.5px solid ${isSub?GOLD:ec.border}`,
-                          borderRadius:"0 10px 10px 0",padding:"6px 10px",overflow:"hidden",cursor:"pointer",
-                          opacity:isSub?0.92:1}}>
-                        <div style={{fontSize:isSub?11:13,fontWeight:700,color:T1,lineHeight:1.2,marginBottom:1}}>
-                          {isSub?"↳ ":""}{item.text}
-                        </div>
-                        {isSub&&<div style={{fontSize:9,color:GOLD,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item._parentText}</div>}
-                        <div style={{fontSize:10,color:T2}}>{fmt(item.time)} – {fmt(endStr)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
+
+            {/* View toggle */}
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16}}>
+              <div style={{fontSize:20,fontWeight:800,color:T1,flex:1,letterSpacing:-0.5}}>Schedule</div>
+              <div style={{...gl(),borderRadius:10,padding:3,display:"flex"}}>
+                {[{v:"day",l:"Day"},{v:"month",l:"Month"}].map(m=>(
+                  <button key={m.v} onClick={()=>setSchedViewMode(m.v)}
+                    style={{padding:"6px 14px",borderRadius:8,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,
+                      background:schedViewMode===m.v?ACC:"transparent",
+                      color:schedViewMode===m.v?"#fff":T2}}>
+                    {m.l}
+                  </button>
+                ))}
               </div>
             </div>
-            {scheduledAll.length===0 && <div style={{textAlign:"center",padding:"32px 0",color:T2,fontSize:14}}>Nothing scheduled today.<br/>Open a task or subtask to add a time.</div>}
+
+            {/* Navigation */}
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <button onClick={()=>schedViewMode==="day"?moveDay(-1):moveMon(-1)}
+                style={{...gl(),border:`0.5px solid ${BORD}`,borderRadius:10,width:36,height:36,
+                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:T1,fontSize:16}}>
+                ‹
+              </button>
+              <div style={{flex:1,textAlign:"center"}}>
+                <div style={{fontSize:14,fontWeight:700,color:T1}}>
+                  {schedViewMode==="day"
+                    ? sdLabel
+                    : schedDate.toLocaleDateString("en-US",{month:"long",year:"numeric"})}
+                </div>
+                {isToday&&schedViewMode==="day"&&<div style={{fontSize:10,color:ACC,fontWeight:600}}>Today</div>}
+              </div>
+              <button onClick={()=>schedViewMode==="day"?moveDay(1):moveMon(1)}
+                style={{...gl(),border:`0.5px solid ${BORD}`,borderRadius:10,width:36,height:36,
+                  cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:T1,fontSize:16}}>
+                ›
+              </button>
+              {!isToday&&<button onClick={()=>setSchedDate(new Date())}
+                style={{padding:"6px 10px",borderRadius:10,border:`0.5px solid ${ACC}`,
+                  background:`${ACC}15`,color:ACC,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                Today
+              </button>}
+            </div>
+
+            {/* Week strip (day view only) */}
+            {schedViewMode==="day"&&(
+              <div style={{...gl(),borderRadius:16,padding:"10px 6px",display:"flex",marginBottom:16}}>
+                {weekDates.map((d,i)=>{
+                  const isSel=d.toDateString()===schedDate.toDateString();
+                  const isTd=d.toDateString()===today.toDateString();
+                  const ds=d.toLocaleDateString("en-CA");
+                  const hasTasks=!!(tasksByDate[ds]);
+                  return (
+                    <div key={i} onClick={()=>setSchedDate(new Date(d))}
+                      style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer"}}>
+                      <div style={{fontSize:9,fontWeight:600,color:T2,textTransform:"uppercase"}}>{WEEK_DAYS[d.getDay()]}</div>
+                      <div style={{width:30,height:30,borderRadius:15,
+                        background:isSel?ACC:"transparent",
+                        border:isTd&&!isSel?`1.5px solid ${ACC}`:"none",
+                        display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                        <span style={{fontSize:14,fontWeight:isSel?700:500,color:isSel?"#fff":T1}}>{d.getDate()}</span>
+                        {hasTasks&&!isSel&&<div style={{position:"absolute",bottom:2,width:4,height:4,borderRadius:2,background:ACC}}/>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{padding:"0 20px"}}>
+            {/* ── DAY VIEW ── */}
+            {schedViewMode==="day"&&(
+              <>
+                <div style={{...gl(),borderRadius:18,padding:"14px 0 14px 14px",overflow:"hidden"}}>
+                  <div style={{display:"flex",gap:4}}>
+                    <div style={{width:48,flexShrink:0,position:"relative",height:TH}}>
+                      {HOURS.map(h=>(
+                        <div key={h} style={{position:"absolute",top:(h*60-DS)*PX-6,fontSize:10,fontWeight:500,color:T2,textAlign:"right",width:44,lineHeight:1}}>
+                          {h===12?"noon":h<12?`${h}am`:`${h-12}pm`}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{flex:1,position:"relative",height:TH,marginRight:14}}>
+                      {HOURS.map(h=>(<div key={h} style={{position:"absolute",top:(h*60-DS)*PX,left:0,right:0,height:0.5,background:"rgba(255,255,255,0.06)"}}/>))}
+                      {np!==null&&(
+                        <div style={{position:"absolute",top:np,left:0,right:0,zIndex:5,display:"flex",alignItems:"center"}}>
+                          <div style={{width:8,height:8,borderRadius:4,background:ACC,marginLeft:-4,flexShrink:0,border:"2px solid #0D0D0F"}}/>
+                          <div style={{flex:1,height:1.5,background:ACC}}/>
+                        </div>
+                      )}
+                      {dayItems.map((item,idx)=>{
+                        const top=(t2m(item.time)-DS)*PX;
+                        const h=Math.max((item.dur||30)*PX,item._type==="subtask"?36:42);
+                        const ec=EC[idx%EC.length];
+                        const endMin=t2m(item.time)+(item.dur||30);
+                        const endStr=`${Math.floor(endMin/60)}:${String(endMin%60).padStart(2,"0")}`;
+                        const isSub=item._type==="subtask";
+                        return (
+                          <div key={item.id} onClick={()=>openDetail(isSub?item._parentId:item.id)}
+                            style={{position:"absolute",top,left:isSub?10:0,right:0,height:h,
+                              background:isSub?"#2A1A05":ec.bg,
+                              borderLeft:`3px solid ${isSub?GOLD:ec.border}`,
+                              borderRadius:"0 10px 10px 0",padding:"5px 10px",overflow:"hidden",cursor:"pointer"}}>
+                            <div style={{fontSize:isSub?10:12,fontWeight:700,color:T1,lineHeight:1.2,marginBottom:1}}>
+                              {isSub?"↳ ":""}{item.text}
+                            </div>
+                            {isSub&&<div style={{fontSize:9,color:GOLD,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item._parentText}</div>}
+                            <div style={{fontSize:9,color:T2}}>{fmt(item.time)} – {fmt(endStr)}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                {dayItems.length===0&&(
+                  <div style={{textAlign:"center",padding:"28px 0",color:T2,fontSize:13}}>
+                    Nothing scheduled{isToday?" today":" for this day"}.<br/>
+                    Open a task or subtask and add a time to schedule it.
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── MONTH VIEW ── */}
+            {schedViewMode==="month"&&(
+              <div style={{...gl(),borderRadius:18,overflow:"hidden"}}>
+                {/* Day headers */}
+                <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:`0.5px solid ${BORD}`}}>
+                  {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>(
+                    <div key={d} style={{textAlign:"center",padding:"10px 0",fontSize:10,fontWeight:700,color:T2}}>{d}</div>
+                  ))}
+                </div>
+                {/* Calendar weeks */}
+                {weeks.map((week,wi)=>(
+                  <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",
+                    borderBottom:wi<weeks.length-1?`0.5px solid ${BORD}`:"none"}}>
+                    {Array.from({length:7},(_,di)=>{
+                      const d=week[di];
+                      if(!d) return <div key={di}/>;
+                      const ds=d.toLocaleDateString("en-CA");
+                      const isSel=d.toDateString()===schedDate.toDateString();
+                      const isTd=d.toDateString()===today.toDateString();
+                      const count=tasksByDate[ds]||0;
+                      const isOtherMo=d.getMonth()!==mo;
+                      return (
+                        <div key={di} onClick={()=>{ setSchedDate(new Date(d)); setSchedViewMode("day"); }}
+                          style={{padding:"8px 4px",textAlign:"center",cursor:"pointer",
+                            background:isSel?`${ACC}20`:"transparent"}}>
+                          <div style={{width:28,height:28,borderRadius:14,margin:"0 auto",
+                            background:isTd?ACC:"transparent",
+                            border:isSel&&!isTd?`1.5px solid ${ACC}`:"none",
+                            display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            <span style={{fontSize:13,fontWeight:isTd||isSel?700:400,
+                              color:isTd?"#fff":isOtherMo?"rgba(255,255,255,0.2)":T1}}>
+                              {d.getDate()}
+                            </span>
+                          </div>
+                          {count>0&&(
+                            <div style={{display:"flex",justifyContent:"center",gap:2,marginTop:3}}>
+                              {Array.from({length:Math.min(count,3)},(_,i)=>(
+                                <div key={i} style={{width:4,height:4,borderRadius:2,background:ACC}}/>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         {sharedTab}
-        </div>
+      </div>
     );
   }
 
@@ -2319,29 +2526,26 @@ export default function App() {
             )}
           </div>
         ))}
-        <div style={{display:"flex",gap:8,marginBottom:28}}>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
           <input value={newTSubText} onChange={e=>setNewTSubText(e.target.value)}
-            onKeyDown={e=>{
-              if(e.key==="Enter"&&newTSubText.trim()){
-                setNewT(n=>({...n,subtasks:[...(n.subtasks||[]),{id:uid(),text:newTSubText.trim(),done:false}]}));
-                setNewTSubText("");
-              }
-            }}
+            onKeyDown={e=>{ if(e.key==="Enter") setSubModal({open:true,text:newTSubText,ctx:"new"}); }}
             placeholder="Add a subtask…"
             style={{...IS,flex:1,padding:"9px 12px",fontSize:13}}/>
-          <button
-            onClick={()=>{
-              if(!newTSubText.trim()) return;
-              setNewT(n=>({...n,subtasks:[...(n.subtasks||[]),{id:uid(),text:newTSubText.trim(),done:false}]}));
-              setNewTSubText("");
-            }}
-            disabled={!newTSubText.trim()}
+          <button onClick={()=>setSubModal({open:true,text:newTSubText,ctx:"new"})}
             style={{padding:"9px 14px",borderRadius:12,border:"none",
-              background:newTSubText.trim()?ACC:"rgba(255,255,255,0.06)",
-              color:newTSubText.trim()?"#fff":T2,fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+              background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
             Add
           </button>
         </div>
+        {subModal.open&&subModal.ctx==="new"&&(
+          <SubtaskModal
+            initial={subModal.text}
+            onClose={()=>{ setSubModal(s=>({...s,open:false})); setNewTSubText(""); }}
+            onAdd={sub=>{ setNewT(n=>({...n,subtasks:[...(n.subtasks||[]),sub]})); setNewTSubText(""); }}
+          />
+        )}
+        <div style={{marginBottom:20}}/>
+
         <button onClick={addManual}
           style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:ACC,color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer"}}>
           Create
