@@ -519,6 +519,8 @@ function LoginScreen() {
 
   return (
     <div style={{...PAGE,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 32px"}}>
+      {/* Required anchor for Clerk CAPTCHA in custom flows */}
+      <div id="clerk-captcha"/>
       <div style={{fontSize:44,marginBottom:16}}>✦</div>
       <div style={{fontSize:28,fontWeight:800,color:T1,marginBottom:6,textAlign:"center"}}>Life OS</div>
       <div style={{fontSize:14,color:T2,marginBottom:40,textAlign:"center",lineHeight:1.5}}>
