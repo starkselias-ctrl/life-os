@@ -1016,6 +1016,11 @@ export default function App() {
   const [syncEnabled,   setSyncEnabled]   = useState(false);
   const [showProfile,   setShowProfile]   = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
+  const [detailShowTime, setDetailShowTime] = useState(false);
+  const [detailShowDue,  setDetailShowDue]  = useState(false);
+  const [subDueEditId,   setSubDueEditId]   = useState(null);
+  const [newTShowTime,   setNewTShowTime]   = useState(false);
+  const [newTShowDue,    setNewTShowDue]    = useState(false);
   const [showBrainDump, setShowBrainDump] = useState(false);
 
   // ── Focus timer ──
@@ -1148,6 +1153,9 @@ export default function App() {
     if(!t) return;
     setEditForm({...t});
     setDetailId(id);
+    setDetailShowTime(!!(t.time||(t.dur&&t.dur!==30)));
+    setDetailShowDue(!!t.due);
+    setSubDueEditId(null);
     setView(v=>{ prevViewRef.current=v; return "task-detail"; });
   },[]);
 
@@ -1587,16 +1595,28 @@ export default function App() {
           <div style={{marginBottom:20}}>
             <Lbl>Subtasks{tdSubs.length>0?` (${tdSubDone}/${tdSubs.length})`:""}</Lbl>
             {tdSubs.map(s=>(
-              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
-                background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
-                <button onClick={()=>toggleSubLocal(s.id)}
-                  style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex"}}>
-                  {Icon.checkSquare(s.done)}
-                </button>
-                <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
-                  textDecoration:s.done?"line-through":"none",flex:1}}>{s.text}</span>
-                <button onClick={()=>setEditForm(f=>({...f,subtasks:f.subtasks.filter(sub=>sub.id!==s.id)}))}
-                  style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
+              <div key={s.id} style={{background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <button onClick={()=>toggleSubLocal(s.id)}
+                    style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex"}}>
+                    {Icon.checkSquare(s.done)}
+                  </button>
+                  <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
+                    textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
+                  {s.due&&<span style={{fontSize:10,color:GOLD,flexShrink:0}}>{s.due}</span>}
+                  <button onClick={()=>setSubDueEditId(id=>id===s.id?null:s.id)}
+                    style={{background:"none",border:"none",cursor:"pointer",fontSize:10,
+                      fontWeight:600,color:subDueEditId===s.id?T2:ACC,padding:"2px 4px",flexShrink:0}}>
+                    {s.due?"date":"+ date"}
+                  </button>
+                  <button onClick={()=>setEditForm(f=>({...f,subtasks:f.subtasks.filter(sub=>sub.id!==s.id)}))}
+                    style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:15,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
+                </div>
+                {subDueEditId===s.id&&(
+                  <input type="date" value={s.due||""}
+                    onChange={e=>setEditForm(f=>({...f,subtasks:f.subtasks.map(sub=>sub.id===s.id?{...sub,due:e.target.value}:sub)}))}
+                    style={{...IS,marginTop:6,padding:"7px 10px",fontSize:12}}/>
+                )}
               </div>
             ))}
             {/* Add subtask input */}
@@ -1610,8 +1630,7 @@ export default function App() {
                 }}
                 placeholder="Add a subtask…"
                 style={{...IS,flex:1,padding:"9px 12px",fontSize:13}}/>
-              <button
-                onClick={()=>{
+              <button onClick={()=>{
                   if(!newSubText.trim()) return;
                   setEditForm(f=>({...f,subtasks:[...f.subtasks,{id:uid(),text:newSubText.trim(),done:false}]}));
                   setNewSubText("");
@@ -1653,22 +1672,46 @@ export default function App() {
             </div>
           </div>
 
-          {/* Time + Duration */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-            <div>
-              <Lbl>Time</Lbl>
-              <input type="time" value={td.time||""} onChange={e=>setEditForm(f=>({...f,time:e.target.value}))} style={IS}/>
-            </div>
-            <div>
-              <Lbl>Duration (min)</Lbl>
-              <input type="number" value={td.dur||""} onChange={e=>setEditForm(f=>({...f,dur:+e.target.value}))} style={IS}/>
-            </div>
-          </div>
+          {/* Time + Duration — collapsed by default */}
+          {detailShowTime ? (
+            <>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
+                <div><Lbl>Time</Lbl><input type="time" value={td.time||""} onChange={e=>setEditForm(f=>({...f,time:e.target.value}))} style={IS}/></div>
+                <div><Lbl>Duration (min)</Lbl><input type="number" value={td.dur||""} onChange={e=>setEditForm(f=>({...f,dur:+e.target.value}))} style={IS}/></div>
+              </div>
+              <button onClick={()=>{setDetailShowTime(false);setEditForm(f=>({...f,time:"",dur:30}));}}
+                style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:14,padding:0}}>
+                Remove time
+              </button>
+            </>
+          ) : (
+            <button onClick={()=>setDetailShowTime(true)}
+              style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+                background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+                width:"100%",textAlign:"left",marginBottom:10}}>
+              + Add time &amp; duration
+            </button>
+          )}
 
-          {/* Due date */}
-          <Lbl>Due date</Lbl>
-          <input type="date" value={td.due||""} onChange={e=>setEditForm(f=>({...f,due:e.target.value}))}
-            style={{...IS,marginBottom:16}}/>
+          {/* Due date — collapsed by default */}
+          {detailShowDue ? (
+            <>
+              <Lbl>Due date</Lbl>
+              <input type="date" value={td.due||""} onChange={e=>setEditForm(f=>({...f,due:e.target.value}))}
+                style={{...IS,marginBottom:8}}/>
+              <button onClick={()=>{setDetailShowDue(false);setEditForm(f=>({...f,due:""}));}}
+                style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:14,padding:0}}>
+                Remove due date
+              </button>
+            </>
+          ) : (
+            <button onClick={()=>setDetailShowDue(true)}
+              style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+                background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+                width:"100%",textAlign:"left",marginBottom:14}}>
+              + Add due date
+            </button>
+          )}
 
           {/* Recurring */}
           <Lbl>Repeats</Lbl>
@@ -2156,20 +2199,66 @@ export default function App() {
         <Lbl>Notes</Lbl>
         <textarea placeholder="Links, references… (optional)" value={newT.notes||""} onChange={e=>setNewT(n=>({...n,notes:e.target.value}))}
           style={{...IS,resize:"none",minHeight:50,marginBottom:16,lineHeight:1.5}}/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-          <div><Lbl>Time</Lbl><input type="time" value={newT.time} onChange={e=>setNewT(n=>({...n,time:e.target.value}))} style={IS}/></div>
-          <div><Lbl>Duration (min)</Lbl><input type="number" placeholder="30" value={newT.dur||""} onChange={e=>setNewT(n=>({...n,dur:+e.target.value}))} style={IS}/></div>
-        </div>
-        <Lbl>Due date</Lbl>
-        <input type="date" value={newT.due} onChange={e=>setNewT(n=>({...n,due:e.target.value}))} style={{...IS,marginBottom:20}}/>
+        {/* Time + Duration toggle */}
+        {newTShowTime ? (
+          <>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:8}}>
+              <div><Lbl>Time</Lbl><input type="time" value={newT.time} onChange={e=>setNewT(n=>({...n,time:e.target.value}))} style={IS}/></div>
+              <div><Lbl>Duration (min)</Lbl><input type="number" placeholder="30" value={newT.dur||""} onChange={e=>setNewT(n=>({...n,dur:+e.target.value}))} style={IS}/></div>
+            </div>
+            <button onClick={()=>{setNewTShowTime(false);setNewT(n=>({...n,time:"",dur:30}));}}
+              style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:14,padding:0}}>
+              Remove time
+            </button>
+          </>
+        ) : (
+          <button onClick={()=>setNewTShowTime(true)}
+            style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+              background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+              width:"100%",textAlign:"left",marginBottom:10}}>
+            + Add time &amp; duration
+          </button>
+        )}
+
+        {/* Due date toggle */}
+        {newTShowDue ? (
+          <>
+            <Lbl>Due date</Lbl>
+            <input type="date" value={newT.due} onChange={e=>setNewT(n=>({...n,due:e.target.value}))} style={{...IS,marginBottom:8}}/>
+            <button onClick={()=>{setNewTShowDue(false);setNewT(n=>({...n,due:""}));}}
+              style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",marginBottom:14,padding:0}}>
+              Remove due date
+            </button>
+          </>
+        ) : (
+          <button onClick={()=>setNewTShowDue(true)}
+            style={{...gl(),borderRadius:10,padding:"10px 14px",border:`0.5px solid ${BORD2}`,
+              background:"transparent",color:ACC,fontSize:13,fontWeight:600,cursor:"pointer",
+              width:"100%",textAlign:"left",marginBottom:14}}>
+            + Add due date
+          </button>
+        )}
+
         <Lbl>Subtasks{(newT.subtasks||[]).length>0?` (${(newT.subtasks||[]).length})`:""}</Lbl>
         {(newT.subtasks||[]).map(s=>(
-          <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
-            background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
-            <span style={{display:"flex",color:T2}}>{Icon.checkSquare(false)}</span>
-            <span style={{fontSize:13,color:T2,flex:1}}>{s.text}</span>
-            <button onClick={()=>setNewT(n=>({...n,subtasks:n.subtasks.filter(sub=>sub.id!==s.id)}))}
-              style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
+          <div key={s.id} style={{background:SURF,borderRadius:8,marginBottom:5}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px"}}>
+              <span style={{display:"flex",color:T2}}>{Icon.checkSquare(false)}</span>
+              <span style={{fontSize:13,color:T2,flex:1}}>{s.text}</span>
+              {s.due&&<span style={{fontSize:10,color:GOLD,flexShrink:0}}>{s.due}</span>}
+              <button onClick={()=>setSubDueEditId(id=>id===s.id?null:s.id)}
+                style={{background:"none",border:"none",cursor:"pointer",fontSize:10,
+                  fontWeight:600,color:subDueEditId===s.id?T2:ACC,padding:"2px 4px",flexShrink:0}}>
+                {s.due?"date":"+ date"}
+              </button>
+              <button onClick={()=>setNewT(n=>({...n,subtasks:n.subtasks.filter(sub=>sub.id!==s.id)}))}
+                style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:15,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
+            </div>
+            {subDueEditId===s.id&&(
+              <input type="date" value={s.due||""}
+                onChange={e=>setNewT(n=>({...n,subtasks:n.subtasks.map(sub=>sub.id===s.id?{...sub,due:e.target.value}:sub)}))}
+                style={{...IS,margin:"0 10px 8px",width:"calc(100% - 20px)",padding:"7px 10px",fontSize:12}}/>
+            )}
           </div>
         ))}
         <div style={{display:"flex",gap:8,marginBottom:28}}>
