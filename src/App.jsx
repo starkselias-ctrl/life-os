@@ -63,6 +63,9 @@ const TODAY_LONG  = new Date().toLocaleDateString("en-US",{weekday:"long",month:
 const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 const today       = new Date();
 
+const CARD_COLORS = ["#2B6AFF","#E84393","#F5A623","#00B894","#FF6348","#A855F7","#0EA5E9","#636370"];
+function greet(){ const h=new Date().getHours(); return h<12?"Good morning":h<17?"Good afternoon":"Good evening"; }
+
 const EC = [
   {bg:"rgba(255,200,80,0.18)",border:"#F5A623"},
   {bg:`rgba(43,106,255,0.18)`,border:ACC},
@@ -615,7 +618,6 @@ export default function App() {
   },[]);
 
   const urgent    = useMemo(()=>tasks.filter(t=>t.priority==="high"&&!t.done),[tasks]);
-  const doneList  = useMemo(()=>tasks.filter(t=>t.done),[tasks]);
   const scheduled = useMemo(()=>[...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time)),[tasks]);
   const weekDates = useMemo(()=>Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()-today.getDay()+i); return d; }),[]);
 
@@ -639,68 +641,83 @@ export default function App() {
   // ══════════════════════════════════
   // HOME
   // ══════════════════════════════════
-  if(view==="home") return (
+  if(view==="home"){
+    const totalOpen=tasks.filter(t=>!t.done).length;
+    let summary;
+    if(totalOpen===0) summary="You're all caught up — nothing open.";
+    else if(urgent.length>0&&scheduled.length>0) summary=`${urgent.length} urgent task${urgent.length>1?"s":""} and ${scheduled.length} scheduled today.`;
+    else if(urgent.length>0) summary=`${urgent.length} urgent task${urgent.length>1?"s":""} need${urgent.length===1?"s":""} your attention.`;
+    else if(scheduled.length>0) summary=`${scheduled.length} task${scheduled.length>1?"s":""} on the schedule today.`;
+    else summary=`${totalOpen} open task${totalOpen>1?"s":""} across ${areas.length} areas.`;
+    return (
     <div style={PAGE}>
-      <div style={{position:"fixed",top:-100,right:-80,width:300,height:300,borderRadius:"50%",background:`${ACC}18`,pointerEvents:"none",zIndex:0,filter:"blur(60px)"}}/>
       <div style={{position:"relative",zIndex:1,paddingBottom:110}}>
-        <div style={{padding:"56px 20px 16px"}}>
-          <div style={{fontSize:12,fontWeight:600,color:T2,letterSpacing:1.2,textTransform:"uppercase",marginBottom:4}}>{TODAY_SHORT}</div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:24}}>
-            <div style={{fontSize:36,fontWeight:800,color:T1,letterSpacing:-1,lineHeight:1.05}}>Hello,<br/>Elias.</div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={openNewArea} style={{padding:"8px 14px",borderRadius:20,border:`1.5px solid ${ACC}`,background:"transparent",color:ACC,fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Area</button>
-              <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }} style={{padding:"8px 14px",borderRadius:20,border:"none",background:ACC,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Task</button>
+
+        {/* ── Header ── */}
+        <div style={{padding:"52px 20px 0"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div>
+              <div style={{fontSize:13,color:T2,marginBottom:2}}>{TODAY_SHORT}</div>
+              <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}, Elias.</div>
             </div>
+            <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }}
+              style={{width:46,height:46,borderRadius:23,background:ACC,border:"none",cursor:"pointer",fontSize:24,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
           </div>
-          {/* Compact stat strip */}
-          <div style={{...gl(),borderRadius:18,display:"flex",marginBottom:20}}>
-            {[
-              {v:urgent.length,   l:"Urgent",    c:PINK},
-              {v:scheduled.length,l:"Scheduled", c:ACC},
-              {v:doneList.length, l:"Done",       c:"#34C759"},
-            ].map((s,i)=>(
-              <div key={s.l} style={{flex:1,textAlign:"center",padding:"14px 8px",borderRight:i<2?`1px solid ${BORD}`:"none"}}>
-                <div style={{fontSize:26,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
-                <div style={{fontSize:10,color:T2,marginTop:3,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{s.l}</div>
-              </div>
-            ))}
+
+          {/* ── Daily summary card ── */}
+          <div style={{...gl(),borderRadius:18,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:14}}>
+            <div style={{width:38,height:38,borderRadius:12,background:`${ACC}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>◎</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,fontWeight:700,color:T2,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Today</div>
+              <div style={{fontSize:14,color:T1,lineHeight:1.4}}>{summary}</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+              <div style={{fontSize:20,fontWeight:800,color:PINK,lineHeight:1}}>{urgent.length}</div>
+              <div style={{fontSize:9,color:T2,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>urgent</div>
+            </div>
           </div>
         </div>
 
+        {/* ── Area grid ── */}
         <div style={{padding:"0 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <Lbl>Areas ({areas.length})</Lbl>
+            <Lbl>My areas</Lbl>
             <button onClick={openNewArea} style={{fontSize:12,fontWeight:700,color:ACC,background:"none",border:"none",cursor:"pointer"}}>+ New</button>
           </div>
-          {/* 2-column compact grid */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
-            {areas.map(a=>{
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+            {areas.map((a,i)=>{
+              const color=CARD_COLORS[i%CARD_COLORS.length];
               const at=tasks.filter(t=>t.area===a.id);
               const openC=at.filter(t=>!t.done).length;
               const doneC=at.filter(t=>t.done).length;
               const pct=at.length?Math.round(doneC/at.length*100):0;
               return (
-                <div key={a.id} style={{...gl(),borderRadius:20,padding:"16px 14px",cursor:"pointer",position:"relative",minHeight:140}}
+                <div key={a.id}
+                  style={{background:color,borderRadius:22,padding:"20px 18px",cursor:"pointer",position:"relative",minHeight:170,display:"flex",flexDirection:"column",justifyContent:"space-between"}}
                   onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}>
-                  <div style={{width:42,height:42,borderRadius:13,background:`${ACC}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:ACC,marginBottom:12,border:`1px solid ${ACC}30`}}>{a.icon}</div>
-                  <div style={{fontSize:14,fontWeight:700,color:T1,marginBottom:8,lineHeight:1.2,paddingRight:16}}>{a.label}</div>
-                  <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
-                    <div style={{fontSize:26,fontWeight:800,color:T1,lineHeight:1}}>{openC}</div>
-                    <div style={{fontSize:10,color:T2,fontWeight:600,textTransform:"uppercase",letterSpacing:0.4}}>open</div>
+                  {/* Top row: icon + edit */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{a.icon}</div>
+                    <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
+                      style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:12,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
                   </div>
-                  <div style={{height:2,borderRadius:1,background:"rgba(255,255,255,0.1)"}}>
-                    <div style={{height:2,borderRadius:1,background:pct===100?"#34C759":ACC,width:`${pct}%`,transition:"width 0.4s"}}/>
+                  {/* Bottom: name + count */}
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.75)",marginBottom:2}}>{a.label}</div>
+                    <div style={{fontSize:34,fontWeight:800,color:"#fff",lineHeight:1,marginBottom:10}}>{openC}</div>
+                    {/* Progress */}
+                    <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.2)"}}>
+                      <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.9)",width:`${pct}%`,transition:"width 0.4s"}}/>
+                    </div>
                   </div>
-                  <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
-                    style={{position:"absolute",top:10,right:10,background:"none",border:"none",cursor:"pointer",fontSize:12,color:"rgba(255,255,255,0.2)",padding:4}}>✎</button>
                 </div>
               );
             })}
-            {/* Add area card */}
+            {/* Add new area */}
             <div onClick={openNewArea}
-              style={{borderRadius:20,padding:"16px 14px",cursor:"pointer",border:`1.5px dashed ${ACC}35`,minHeight:140,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6}}>
-              <div style={{fontSize:32,color:ACC,lineHeight:1}}>+</div>
-              <div style={{fontSize:13,fontWeight:700,color:ACC}}>New area</div>
+              style={{borderRadius:22,padding:"20px 18px",cursor:"pointer",border:`2px dashed rgba(255,255,255,0.15)`,minHeight:170,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
+              <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:T2}}>+</div>
+              <div style={{fontSize:13,fontWeight:600,color:T2}}>New area</div>
             </div>
           </div>
         </div>
@@ -710,7 +727,7 @@ export default function App() {
       {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
     </div>
-  );
+  );}
 
   // ══════════════════════════════════
   // AREA DETAIL
