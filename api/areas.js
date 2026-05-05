@@ -1,24 +1,12 @@
-import { createClerkClient } from "@clerk/backend";
 import { neon } from "@neondatabase/serverless";
-
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+import { requireAuth, setCors } from "./_lib/auth.js";
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-  let userId;
-  try {
-    const payload = await clerk.verifyToken(token);
-    userId = payload.sub;
-  } catch {
-    return res.status(401).json({ error: "Invalid token" });
-  }
+  const userId = await requireAuth(req, res);
+  if (!userId) return;
 
   const sql = neon(process.env.DATABASE_URL);
 
