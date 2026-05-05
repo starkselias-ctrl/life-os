@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import { useAuth, useSignIn, useSignUp } from "@clerk/clerk-react";
+import { useAuth, useUser, useSignIn, useSignUp } from "@clerk/clerk-react";
 
 const ACC  = "#2B6AFF";
 const PINK = "#E84393";
@@ -625,9 +625,10 @@ function LoginScreen() {
 
           {method==="password" && (
             <button onClick={handleForgot} disabled={loading}
-              style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",
-                marginBottom:16,alignSelf:"flex-start",padding:0,textDecoration:"underline"}}>
-              Forgot password?
+              style={{width:"100%",padding:"12px",borderRadius:12,border:`1px solid ${BORD}`,
+                background:"rgba(255,255,255,0.04)",color:T2,fontSize:14,fontWeight:600,
+                cursor:"pointer",marginBottom:14,textAlign:"center"}}>
+              Forgot password? Send reset code →
             </button>
           )}
 
@@ -700,6 +701,91 @@ function LoginScreen() {
 }
 
 // ─────────────────────────────────────────
+// CHANGE PASSWORD SHEET
+// ─────────────────────────────────────────
+function ChangePasswordSheet({ onClose }) {
+  const { user } = useUser();
+  const [cur,    setCur]    = useState("");
+  const [next,   setNext]   = useState("");
+  const [confirm,setConfirm]= useState("");
+  const [showCur, setShowCur] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [err,     setErr]     = useState("");
+  const [ok,      setOk]      = useState(false);
+
+  async function handleChange() {
+    if(!cur.trim()||!next.trim()) return;
+    if(next!==confirm){ setErr("New passwords don't match."); return; }
+    if(next.length<8){ setErr("Password must be at least 8 characters."); return; }
+    setLoading(true); setErr("");
+    try {
+      await user.updatePassword({ currentPassword:cur, newPassword:next });
+      setOk(true);
+      setTimeout(onClose, 1500);
+    } catch(e) {
+      setErr(e.errors?.[0]?.message || "Could not update password.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <Sheet onClose={onClose} tall={false}>
+      <div style={{fontSize:20,fontWeight:800,color:T1,marginBottom:20}}>Change Password</div>
+      {ok ? (
+        <div style={{textAlign:"center",padding:"20px 0"}}>
+          <div style={{fontSize:32,marginBottom:10}}>✓</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#34C759"}}>Password updated!</div>
+        </div>
+      ) : (
+        <>
+          {err&&<div style={{...gl(),borderRadius:12,padding:"12px 14px",marginBottom:14,
+            border:`1px solid ${PINK}40`,background:`${PINK}12`,
+            fontSize:13,color:"rgba(255,255,255,0.9)",lineHeight:1.5}}>{err}</div>}
+          <Lbl>Current password</Lbl>
+          <div style={{position:"relative",marginBottom:12}}>
+            <input type={showCur?"text":"password"} value={cur} onChange={e=>setCur(e.target.value)}
+              placeholder="Current password" style={{...IS,paddingRight:52}}/>
+            <button onClick={()=>setShowCur(s=>!s)}
+              style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",color:T2,cursor:"pointer",fontSize:13,fontWeight:600}}>
+              {showCur?"Hide":"Show"}
+            </button>
+          </div>
+          <Lbl>New password</Lbl>
+          <div style={{position:"relative",marginBottom:12}}>
+            <input type={showNew?"text":"password"} value={next} onChange={e=>setNext(e.target.value)}
+              placeholder="New password (min 8 chars)" style={{...IS,paddingRight:52}}/>
+            <button onClick={()=>setShowNew(s=>!s)}
+              style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",color:T2,cursor:"pointer",fontSize:13,fontWeight:600}}>
+              {showNew?"Hide":"Show"}
+            </button>
+          </div>
+          <Lbl>Confirm new password</Lbl>
+          <input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&handleChange()}
+            placeholder="Repeat new password" style={{...IS,marginBottom:24}}/>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={onClose}
+              style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",
+                background:"rgba(255,255,255,0.08)",color:T2,fontSize:15,fontWeight:600,cursor:"pointer"}}>
+              Cancel
+            </button>
+            <button onClick={handleChange} disabled={!cur||!next||!confirm||loading}
+              style={{flex:2,padding:"14px 0",borderRadius:14,border:"none",cursor:"pointer",
+                background:cur&&next&&confirm&&!loading?ACC:"rgba(255,255,255,0.08)",
+                color:cur&&next&&confirm&&!loading?"#fff":T2,fontSize:15,fontWeight:700}}>
+              {loading?"Updating…":"Update password"}
+            </button>
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+// ─────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────
 export default function App() {
@@ -727,7 +813,10 @@ export default function App() {
 
   // ── Clerk auth ──
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useAuth();
-  const [syncEnabled, setSyncEnabled] = useState(false);
+  const { user } = useUser();
+  const [syncEnabled,   setSyncEnabled]   = useState(false);
+  const [showProfile,   setShowProfile]   = useState(false);
+  const [showChangePw,  setShowChangePw]  = useState(false);
 
   const tasksRef      = useRef(tasks);
   const editFormRef   = useRef(editForm);
@@ -973,10 +1062,8 @@ export default function App() {
               <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}, Elias.</div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <button onClick={()=>signOut()}
-                style={{fontSize:11,fontWeight:700,color:T2,background:"rgba(255,255,255,0.07)",border:"none",borderRadius:20,padding:"6px 12px",cursor:"pointer"}}>
-                Sign out
-              </button>
+              <button onClick={()=>setShowProfile(true)}
+                style={{width:36,height:36,borderRadius:18,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",fontSize:16,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>⚙</button>
               <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }}
                 style={{width:46,height:46,borderRadius:23,background:ACC,border:"none",cursor:"pointer",fontSize:24,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
             </div>
@@ -1146,6 +1233,26 @@ export default function App() {
       {sharedDetail}
       {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
+      {/* Profile / settings sheet */}
+      {showProfile && !showChangePw && (
+        <Sheet onClose={()=>setShowProfile(false)}>
+          <div style={{fontSize:20,fontWeight:800,color:T1,marginBottom:6}}>Account</div>
+          <div style={{fontSize:13,color:T2,marginBottom:24}}>{user?.primaryEmailAddress?.emailAddress}</div>
+          <button onClick={()=>setShowChangePw(true)}
+            style={{width:"100%",padding:"15px 18px",borderRadius:16,border:`1px solid ${BORD}`,
+              background:"rgba(255,255,255,0.05)",color:T1,fontSize:15,fontWeight:600,
+              cursor:"pointer",textAlign:"left",marginBottom:10}}>
+            🔑 Change password
+          </button>
+          <button onClick={()=>{ signOut(); setShowProfile(false); }}
+            style={{width:"100%",padding:"15px 18px",borderRadius:16,border:`1px solid ${PINK}30`,
+              background:`${PINK}10`,color:PINK,fontSize:15,fontWeight:600,
+              cursor:"pointer",textAlign:"left"}}>
+            Sign out
+          </button>
+        </Sheet>
+      )}
+      {showChangePw && <ChangePasswordSheet onClose={()=>{ setShowChangePw(false); setShowProfile(false); }}/>}
     </div>
   );}
 
