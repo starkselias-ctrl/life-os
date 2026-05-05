@@ -13,10 +13,11 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const rows = await sql`
-        SELECT id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring
+        SELECT id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring, pin_today
         FROM tasks WHERE user_id = ${userId}
       `;
-      return res.json(rows);
+      // Map snake_case → camelCase for the frontend
+      return res.json(rows.map(r => ({ ...r, pinToday: r.pin_today })));
     }
 
     if (req.method === "POST") {
@@ -24,18 +25,19 @@ export default async function handler(req, res) {
       if (!tasks?.length) return res.json({ ok: true });
       for (const t of tasks) {
         await sql`
-          INSERT INTO tasks (id, user_id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring)
+          INSERT INTO tasks (id, user_id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring, pin_today)
           VALUES (
             ${t.id}, ${userId}, ${t.text}, ${t.area||"inbox"}, ${t.done||false},
             ${t.priority||"med"}, ${t.due||""}, ${t.time||""}, ${t.dur||30},
             ${t.desc||""}, ${t.notes||""}, ${JSON.stringify(t.subtasks||[])},
-            ${t.recurring||null}
+            ${t.recurring||null}, ${t.pinToday||false}
           )
           ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text, area = EXCLUDED.area, done = EXCLUDED.done,
             priority = EXCLUDED.priority, due = EXCLUDED.due, time = EXCLUDED.time,
             dur = EXCLUDED.dur, desc = EXCLUDED.desc, notes = EXCLUDED.notes,
-            subtasks = EXCLUDED.subtasks, recurring = EXCLUDED.recurring
+            subtasks = EXCLUDED.subtasks, recurring = EXCLUDED.recurring,
+            pin_today = EXCLUDED.pin_today
         `;
       }
       return res.json({ ok: true });

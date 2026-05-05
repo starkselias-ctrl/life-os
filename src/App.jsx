@@ -1019,6 +1019,7 @@ export default function App() {
   const [detailShowTime, setDetailShowTime] = useState(false);
   const [detailShowDue,  setDetailShowDue]  = useState(false);
   const [subDueEditId,   setSubDueEditId]   = useState(null);
+  const [subTimeEditId,  setSubTimeEditId]  = useState(null);
   const [newTShowTime,   setNewTShowTime]   = useState(false);
   const [newTShowDue,    setNewTShowDue]    = useState(false);
   const [showBrainDump, setShowBrainDump] = useState(false);
@@ -1156,6 +1157,7 @@ export default function App() {
     setDetailShowTime(!!(t.time||(t.dur&&t.dur!==30)));
     setDetailShowDue(!!t.due);
     setSubDueEditId(null);
+    setSubTimeEditId(null);
     setView(v=>{ prevViewRef.current=v; return "task-detail"; });
   },[]);
 
@@ -1279,6 +1281,21 @@ export default function App() {
   const scheduled = useMemo(()=>[...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time)),[tasks]);
   const weekDates = useMemo(()=>Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()-today.getDay()+i); return d; }),[]);
 
+  // Schedule view items: tasks with time + scheduled subtasks
+  const scheduledAll = useMemo(()=>{
+    const items=[];
+    for(const t of tasks){
+      if(t.time&&!t.done) items.push({...t,_type:"task"});
+      for(const s of (t.subtasks||[])){
+        if(s.time&&!s.done) items.push({
+          ...s,dur:s.dur||30,_type:"subtask",
+          _parentId:t.id,_parentText:t.text,_area:t.area,
+        });
+      }
+    }
+    return items.sort((a,b)=>t2m(a.time)-t2m(b.time));
+  },[tasks]);
+
   const detailToggle = useCallback(()=>{ toggle(detailId); closeDetail(); },[detailId,toggle,closeDetail]);
   const detailDelete = useCallback(()=>delTask(detailId),[detailId,delTask]);
 
@@ -1305,7 +1322,13 @@ export default function App() {
     const totalOpen=tasks.filter(t=>!t.done).length;
     // Today's focus list: scheduled first, then urgent-only, deduplicated
     const scheduledIds = new Set(scheduled.map(t=>t.id));
-    const todayTasks = [...scheduled, ...urgent.filter(t=>!scheduledIds.has(t.id))];
+    const pinnedToday  = tasks.filter(t=>t.pinToday&&!t.done&&!scheduledIds.has(t.id));
+    const pinnedIds    = new Set(pinnedToday.map(t=>t.id));
+    const todayTasks   = [
+      ...scheduled,
+      ...pinnedToday,
+      ...urgent.filter(t=>!t.done&&!scheduledIds.has(t.id)&&!pinnedIds.has(t.id)),
+    ];
     return (
     <div style={PAGE}>
       <div style={{position:"relative",zIndex:1,paddingBottom:110}}>
@@ -1577,8 +1600,8 @@ export default function App() {
             )}
           </div>
 
-          {/* Tag pills */}
-          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
+          {/* Tag pills + Pin to Today */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20,alignItems:"center"}}>
             <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,
               background:tdT.accent+"20",color:tdT.accent}}>{tdArea.label}</span>
             {td.priority==="high"&&(
@@ -1589,6 +1612,14 @@ export default function App() {
               <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,
                 background:"#0D1A35",color:ACC}}>Normal</span>
             )}
+            {/* Pin to Today toggle */}
+            <button onClick={()=>setEditForm(f=>({...f,pinToday:!f.pinToday}))}
+              style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,cursor:"pointer",
+                border:`0.5px solid ${td.pinToday?ACC:BORD2}`,
+                background:td.pinToday?ACC+"20":"transparent",
+                color:td.pinToday?ACC:T2}}>
+              {td.pinToday?"★ In Today":"☆ Add to Today"}
+            </button>
           </div>
 
           {/* Subtasks */}
@@ -1604,14 +1635,31 @@ export default function App() {
                   <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
                     textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
                   {s.due&&<span style={{fontSize:10,color:GOLD,flexShrink:0}}>{s.due}</span>}
-                  <button onClick={()=>setSubDueEditId(id=>id===s.id?null:s.id)}
+                  {/* Time button */}
+                  <button onClick={()=>{ setSubTimeEditId(id=>id===s.id?null:s.id); setSubDueEditId(null); }}
                     style={{background:"none",border:"none",cursor:"pointer",fontSize:10,
-                      fontWeight:600,color:subDueEditId===s.id?T2:ACC,padding:"2px 4px",flexShrink:0}}>
-                    {s.due?"date":"+ date"}
+                      fontWeight:600,color:s.time?GOLD:T2,padding:"2px 4px",flexShrink:0}}>
+                    {s.time?fmt(s.time):"+ time"}
+                  </button>
+                  {/* Date button */}
+                  <button onClick={()=>{ setSubDueEditId(id=>id===s.id?null:s.id); setSubTimeEditId(null); }}
+                    style={{background:"none",border:"none",cursor:"pointer",fontSize:10,
+                      fontWeight:600,color:s.due?ACC:T2,padding:"2px 4px",flexShrink:0}}>
+                    {s.due?s.due:"+ date"}
                   </button>
                   <button onClick={()=>setEditForm(f=>({...f,subtasks:f.subtasks.filter(sub=>sub.id!==s.id)}))}
                     style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:15,cursor:"pointer",padding:"0 2px",flexShrink:0}}>×</button>
                 </div>
+                {subTimeEditId===s.id&&(
+                  <div style={{display:"flex",gap:6,marginTop:6}}>
+                    <input type="time" value={s.time||""}
+                      onChange={e=>setEditForm(f=>({...f,subtasks:f.subtasks.map(sub=>sub.id===s.id?{...sub,time:e.target.value}:sub)}))}
+                      style={{...IS,flex:1,padding:"7px 10px",fontSize:12}}/>
+                    <input type="number" placeholder="min" value={s.dur||""}
+                      onChange={e=>setEditForm(f=>({...f,subtasks:f.subtasks.map(sub=>sub.id===s.id?{...sub,dur:+e.target.value}:sub)}))}
+                      style={{...IS,width:70,padding:"7px 10px",fontSize:12}}/>
+                  </div>
+                )}
                 {subDueEditId===s.id&&(
                   <input type="date" value={s.due||""}
                     onChange={e=>setEditForm(f=>({...f,subtasks:f.subtasks.map(sub=>sub.id===s.id?{...sub,due:e.target.value}:sub)}))}
@@ -1783,7 +1831,7 @@ export default function App() {
     const offset=CIRC-(pct/100)*CIRC;
     return (
       <div style={{...PAGE,display:"flex",flexDirection:"column",alignItems:"center",
-        justifyContent:"center",padding:"40px 20px",minHeight:"100vh"}}>
+        justifyContent:"center",padding:"40px 20px 90px",minHeight:"100vh"}}>
         <div style={{fontSize:9,fontWeight:700,color:MUTED,letterSpacing:"0.1em",
           textTransform:"uppercase",marginBottom:32}}>Focus mode</div>
 
@@ -1973,23 +2021,33 @@ export default function App() {
                       <div style={{flex:1,height:1.5,background:ACC}}/>
                     </div>
                   )}
-                  {scheduled.map((t,idx)=>{
-                    const top=(t2m(t.time)-DS)*PX;
-                    const h=Math.max((t.dur||30)*PX,44);
+                  {scheduledAll.map((item,idx)=>{
+                    const top=(t2m(item.time)-DS)*PX;
+                    const h=Math.max((item.dur||30)*PX,item._type==="subtask"?38:44);
                     const ec=EC[idx%EC.length];
-                    const endMin=t2m(t.time)+(t.dur||30);
+                    const endMin=t2m(item.time)+(item.dur||30);
                     const endStr=`${Math.floor(endMin/60)}:${String(endMin%60).padStart(2,"0")}`;
+                    const isSub=item._type==="subtask";
                     return (
-                      <div key={t.id} onClick={()=>openDetail(t.id)} style={{position:"absolute",top,left:0,right:0,height:h,background:ec.bg,borderLeft:`3.5px solid ${ec.border}`,borderRadius:"0 12px 12px 0",padding:"7px 12px",overflow:"hidden",cursor:"pointer"}}>
-                        <div style={{fontSize:13,fontWeight:700,color:T1,lineHeight:1.2,marginBottom:2}}>{t.text}</div>
-                        <div style={{fontSize:11,color:T2}}>{fmt(t.time)} – {fmt(endStr)}</div>
+                      <div key={item.id}
+                        onClick={()=>openDetail(isSub?item._parentId:item.id)}
+                        style={{position:"absolute",top,left:isSub?10:0,right:0,height:h,
+                          background:isSub?"#2A1A05":ec.bg,
+                          borderLeft:`3.5px solid ${isSub?GOLD:ec.border}`,
+                          borderRadius:"0 10px 10px 0",padding:"6px 10px",overflow:"hidden",cursor:"pointer",
+                          opacity:isSub?0.92:1}}>
+                        <div style={{fontSize:isSub?11:13,fontWeight:700,color:T1,lineHeight:1.2,marginBottom:1}}>
+                          {isSub?"↳ ":""}{item.text}
+                        </div>
+                        {isSub&&<div style={{fontSize:9,color:GOLD,marginBottom:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item._parentText}</div>}
+                        <div style={{fontSize:10,color:T2}}>{fmt(item.time)} – {fmt(endStr)}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
             </div>
-            {scheduled.length===0 && <div style={{textAlign:"center",padding:"32px 0",color:T2,fontSize:14}}>No tasks scheduled today.<br/>Tap any task to add a time.</div>}
+            {scheduledAll.length===0 && <div style={{textAlign:"center",padding:"32px 0",color:T2,fontSize:14}}>Nothing scheduled today.<br/>Open a task or subtask to add a time.</div>}
           </div>
         </div>
         {sharedTab}
