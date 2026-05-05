@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import { useAuth, useSignIn } from "@clerk/clerk-react";
+import { useAuth, useSignIn, useSignUp } from "@clerk/clerk-react";
 
 const ACC  = "#2B6AFF";
 const PINK = "#E84393";
@@ -464,29 +464,50 @@ const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, ar
 // LOGIN SCREEN
 // ─────────────────────────────────────────
 function LoginScreen() {
-  const { signIn, isLoaded, setActive } = useSignIn();
-  const [email, setEmail] = useState("");
-  const [code,  setCode]  = useState("");
-  const [step,  setStep]  = useState("email");
+  const { signIn, isLoaded:siLoaded, setActive:setSiActive } = useSignIn();
+  const { signUp, isLoaded:suLoaded, setActive:setSuActive } = useSignUp();
+  const [email,   setEmail]   = useState("");
+  const [code,    setCode]    = useState("");
+  const [step,    setStep]    = useState("email"); // "email" | "code"
+  const [mode,    setMode]    = useState("in");    // "in" | "up"
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
+  const [err,     setErr]     = useState("");
 
-  async function sendCode() {
-    if(!isLoaded||!email.trim()) return;
+  const ready = siLoaded && suLoaded;
+
+  async function handleEmail() {
+    if(!ready||!email.trim()) return;
     setLoading(true); setErr("");
     try {
+      // Try sign-in first
       await signIn.create({ strategy:"email_code", identifier:email });
-      setStep("code");
-    } catch(e) { setErr(e.errors?.[0]?.message||"Something went wrong"); }
+      setMode("in"); setStep("code");
+    } catch(e) {
+      // If no account, auto sign-up instead
+      if(e.errors?.[0]?.code==="form_identifier_not_found") {
+        try {
+          await signUp.create({ emailAddress:email });
+          await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
+          setMode("up"); setStep("code");
+        } catch(e2) { setErr(e2.errors?.[0]?.message||"Something went wrong"); }
+      } else {
+        setErr(e.errors?.[0]?.message||"Something went wrong");
+      }
+    }
     setLoading(false);
   }
 
-  async function verify() {
-    if(!isLoaded||code.length!==6) return;
+  async function handleCode() {
+    if(!ready||code.length!==6) return;
     setLoading(true); setErr("");
     try {
-      const result = await signIn.attemptFirstFactor({ strategy:"email_code", code });
-      if(result.status==="complete") await setActive({ session:result.createdSessionId });
+      if(mode==="in") {
+        const r = await signIn.attemptFirstFactor({ strategy:"email_code", code });
+        if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
+      } else {
+        const r = await signUp.attemptEmailAddressVerification({ code });
+        if(r.status==="complete") await setSuActive({ session:r.createdSessionId });
+      }
     } catch(e) { setErr(e.errors?.[0]?.message||"Invalid code"); }
     setLoading(false);
   }
@@ -496,35 +517,41 @@ function LoginScreen() {
       <div style={{fontSize:44,marginBottom:16}}>✦</div>
       <div style={{fontSize:28,fontWeight:800,color:T1,marginBottom:6,textAlign:"center"}}>Life OS</div>
       <div style={{fontSize:14,color:T2,marginBottom:40,textAlign:"center",lineHeight:1.5}}>
-        Sign in to sync your tasks<br/>across all your devices
+        Sign in or create an account<br/>to sync your tasks everywhere
       </div>
       {step==="email" ? (
         <>
           <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&sendCode()} placeholder="your@email.com" autoFocus
+            onKeyDown={e=>e.key==="Enter"&&handleEmail()} placeholder="your@email.com" autoFocus
             style={{...IS,marginBottom:12,textAlign:"center",fontSize:17}}/>
           {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
-          <button onClick={sendCode} disabled={!email.trim()||loading||!isLoaded}
+          <button onClick={handleEmail} disabled={!email.trim()||loading||!ready}
             style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
               background:email.trim()&&!loading?ACC:"rgba(255,255,255,0.08)",
               color:email.trim()&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer"}}>
-            {loading?"Sending…":"Send code →"}
+            {loading?"Checking…":"Continue →"}
           </button>
         </>
       ) : (
         <>
+          <div style={{...gl(),borderRadius:14,padding:"10px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:12,color:mode==="up"?"#34C759":ACC,fontWeight:700}}>
+              {mode==="up"?"New account":"Welcome back"}
+            </span>
+            <span style={{fontSize:12,color:T2}}>{email}</span>
+          </div>
           <div style={{fontSize:14,color:T2,marginBottom:16,textAlign:"center",lineHeight:1.6}}>
-            Enter the 6-digit code sent to<br/><strong style={{color:T1}}>{email}</strong>
+            Enter the 6-digit code sent to your email
           </div>
           <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
-            onKeyDown={e=>e.key==="Enter"&&verify()} placeholder="000000" maxLength={6} autoFocus
+            onKeyDown={e=>e.key==="Enter"&&handleCode()} placeholder="000000" maxLength={6} autoFocus
             style={{...IS,marginBottom:12,textAlign:"center",fontSize:28,letterSpacing:10,fontWeight:700}}/>
           {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
-          <button onClick={verify} disabled={code.length!==6||loading}
+          <button onClick={handleCode} disabled={code.length!==6||loading}
             style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
               background:code.length===6&&!loading?ACC:"rgba(255,255,255,0.08)",
               color:code.length===6&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer",marginBottom:12}}>
-            {loading?"Verifying…":"Sign in →"}
+            {loading?"Verifying…":mode==="up"?"Create account →":"Sign in →"}
           </button>
           <button onClick={()=>{setStep("email");setCode("");setErr("");}}
             style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer"}}>
