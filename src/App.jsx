@@ -460,7 +460,8 @@ export default function App() {
   const [view,   setView]   = useState("home");
   const [tab,    setTab]    = useState("home");
   const [activeArea,  setActiveArea]  = useState(null);
-  const [showDone,    setShowDone]    = useState(false);
+  const [showDone,     setShowDone]    = useState(false);
+  const [expandedArea, setExpandedArea] = useState(null);
   const [detailId,    setDetailId]    = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
@@ -668,12 +669,16 @@ export default function App() {
           </div>
           {areas.map(a=>{
             const at=tasks.filter(t=>t.area===a.id);
-            const openC=at.filter(t=>!t.done).length;
+            const open=at.filter(t=>!t.done);
+            const openC=open.length;
             const doneC=at.filter(t=>t.done).length;
             const pct=at.length?Math.round(doneC/at.length*100):0;
+            const isExp=expandedArea===a.id;
             return (
-              <div key={a.id} style={{...gl(0.78,24),borderRadius:20,marginBottom:10,display:"flex",alignItems:"center",gap:14,padding:"16px 18px",position:"relative",cursor:"pointer"}}>
-                <div onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }} style={{display:"contents"}}>
+              <div key={a.id} style={{...gl(0.78,24),borderRadius:20,marginBottom:10,overflow:"hidden",position:"relative"}}>
+                {/* Header row — tap to expand */}
+                <div onClick={()=>setExpandedArea(ea=>ea===a.id?null:a.id)}
+                  style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",cursor:"pointer"}}>
                   <div style={{width:44,height:44,borderRadius:14,background:`${ACC}15`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:ACC,flexShrink:0,border:`1px solid ${ACC}28`,fontWeight:700}}>{a.icon}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:17,fontWeight:700,color:"#1C1C1E"}}>{a.label}</div>
@@ -682,14 +687,36 @@ export default function App() {
                       <div style={{height:3,borderRadius:2,background:pct===100?"#34C759":ACC,width:`${pct}%`}}/>
                     </div>
                   </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{textAlign:"right",flexShrink:0,marginRight:6}}>
                     <div style={{fontSize:22,fontWeight:800,color:"#1C1C1E",lineHeight:1}}>{openC}</div>
                     <div style={{fontSize:11,color:"#8E8E93",marginTop:1}}>open</div>
                   </div>
-                  <span style={{color:"#C7C7CC",fontSize:16,marginLeft:2}}>›</span>
+                  <span style={{color:"#C7C7CC",fontSize:18,transition:"transform 0.25s",display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}>›</span>
                 </div>
                 <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
-                  style={{position:"absolute",top:10,right:48,background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#C7C7CC",padding:4}}>✎</button>
+                  style={{position:"absolute",top:12,right:54,background:"none",border:"none",cursor:"pointer",fontSize:14,color:"#C7C7CC",padding:4}}>✎</button>
+                {/* Expanded task list */}
+                {isExp && (
+                  <div style={{borderTop:"1px solid rgba(0,0,0,0.06)"}}>
+                    {open.length>0 ? open.map((t,i)=>(
+                      <div key={t.id}>
+                        <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
+                        {i<open.length-1 && <div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
+                      </div>
+                    )) : (
+                      <div style={{padding:"18px",textAlign:"center"}}>
+                        <div style={{fontSize:13,color:"#8E8E93"}}>All done in {a.label} ✓</div>
+                      </div>
+                    )}
+                    <button onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}
+                      style={{width:"100%",padding:"12px 18px",background:"none",border:"none",
+                        borderTop:"1px solid rgba(0,0,0,0.06)",cursor:"pointer",
+                        display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <span style={{fontSize:13,fontWeight:700,color:ACC}}>View all & completed</span>
+                      <span style={{fontSize:14,color:ACC}}>›</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
