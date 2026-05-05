@@ -466,7 +466,6 @@ export default function App() {
   const [tab,    setTab]    = useState("home");
   const [activeArea,   setActiveArea]  = useState(null);
   const [showDone,     setShowDone]    = useState(false);
-  const [expandedArea, setExpandedArea] = useState(null);
   const [detailId,    setDetailId]    = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
@@ -653,16 +652,16 @@ export default function App() {
               <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }} style={{padding:"8px 14px",borderRadius:20,border:"none",background:ACC,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ Task</button>
             </div>
           </div>
-          {/* Bold solid stat cards like the reference design */}
-          <div style={{display:"flex",gap:10,marginBottom:24}}>
+          {/* Compact stat strip */}
+          <div style={{...gl(),borderRadius:18,display:"flex",marginBottom:20}}>
             {[
-              {v:urgent.length,   l:"Urgent",    bg:PINK},
-              {v:scheduled.length,l:"Scheduled", bg:ACC},
-              {v:doneList.length, l:"Done",       bg:"#34C759"},
-            ].map(s=>(
-              <div key={s.l} style={{flex:1,background:s.bg,borderRadius:18,padding:"16px 12px",textAlign:"center"}}>
-                <div style={{fontSize:28,fontWeight:800,color:"#fff",lineHeight:1}}>{s.v}</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.75)",marginTop:4,fontWeight:600,letterSpacing:0.5}}>{s.l}</div>
+              {v:urgent.length,   l:"Urgent",    c:PINK},
+              {v:scheduled.length,l:"Scheduled", c:ACC},
+              {v:doneList.length, l:"Done",       c:"#34C759"},
+            ].map((s,i)=>(
+              <div key={s.l} style={{flex:1,textAlign:"center",padding:"14px 8px",borderRight:i<2?`1px solid ${BORD}`:"none"}}>
+                <div style={{fontSize:26,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:10,color:T2,marginTop:3,fontWeight:600,letterSpacing:0.5,textTransform:"uppercase"}}>{s.l}</div>
               </div>
             ))}
           </div>
@@ -671,62 +670,38 @@ export default function App() {
         <div style={{padding:"0 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <Lbl>Areas ({areas.length})</Lbl>
-            <button onClick={openNewArea} style={{fontSize:12,fontWeight:700,color:ACC,background:"none",border:"none",cursor:"pointer"}}>Manage ›</button>
+            <button onClick={openNewArea} style={{fontSize:12,fontWeight:700,color:ACC,background:"none",border:"none",cursor:"pointer"}}>+ New</button>
           </div>
-          {areas.map(a=>{
-            const at=tasks.filter(t=>t.area===a.id);
-            const open=at.filter(t=>!t.done);
-            const openC=open.length;
-            const doneC=at.filter(t=>t.done).length;
-            const pct=at.length?Math.round(doneC/at.length*100):0;
-            const isExp=expandedArea===a.id;
-            return (
-              <div key={a.id} style={{...gl(),borderRadius:20,marginBottom:10,overflow:"hidden",position:"relative"}}>
-                <div onClick={()=>setExpandedArea(ea=>ea===a.id?null:a.id)}
-                  style={{display:"flex",alignItems:"center",gap:14,padding:"16px 18px",cursor:"pointer"}}>
-                  <div style={{width:44,height:44,borderRadius:14,background:`${ACC}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:ACC,flexShrink:0,border:`1px solid ${ACC}35`,fontWeight:700}}>{a.icon}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:17,fontWeight:700,color:T1}}>{a.label}</div>
-                    <div style={{fontSize:12,color:T2,marginTop:1}}>{a.sub}</div>
-                    <div style={{marginTop:8,height:3,borderRadius:2,background:"rgba(255,255,255,0.1)"}}>
-                      <div style={{height:3,borderRadius:2,background:pct===100?"#34C759":ACC,width:`${pct}%`,transition:"width 0.4s"}}/>
-                    </div>
+          {/* 2-column compact grid */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:20}}>
+            {areas.map(a=>{
+              const at=tasks.filter(t=>t.area===a.id);
+              const openC=at.filter(t=>!t.done).length;
+              const doneC=at.filter(t=>t.done).length;
+              const pct=at.length?Math.round(doneC/at.length*100):0;
+              return (
+                <div key={a.id} style={{...gl(),borderRadius:20,padding:"16px 14px",cursor:"pointer",position:"relative",minHeight:140}}
+                  onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}>
+                  <div style={{width:42,height:42,borderRadius:13,background:`${ACC}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:ACC,marginBottom:12,border:`1px solid ${ACC}30`}}>{a.icon}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:T1,marginBottom:8,lineHeight:1.2,paddingRight:16}}>{a.label}</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:10}}>
+                    <div style={{fontSize:26,fontWeight:800,color:T1,lineHeight:1}}>{openC}</div>
+                    <div style={{fontSize:10,color:T2,fontWeight:600,textTransform:"uppercase",letterSpacing:0.4}}>open</div>
                   </div>
-                  <div style={{textAlign:"right",flexShrink:0,marginRight:6}}>
-                    <div style={{fontSize:22,fontWeight:800,color:T1,lineHeight:1}}>{openC}</div>
-                    <div style={{fontSize:11,color:T2,marginTop:1}}>open</div>
+                  <div style={{height:2,borderRadius:1,background:"rgba(255,255,255,0.1)"}}>
+                    <div style={{height:2,borderRadius:1,background:pct===100?"#34C759":ACC,width:`${pct}%`,transition:"width 0.4s"}}/>
                   </div>
-                  <span style={{color:"rgba(255,255,255,0.25)",fontSize:18,transition:"transform 0.25s",display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                  <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
+                    style={{position:"absolute",top:10,right:10,background:"none",border:"none",cursor:"pointer",fontSize:12,color:"rgba(255,255,255,0.2)",padding:4}}>✎</button>
                 </div>
-                <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
-                  style={{position:"absolute",top:12,right:54,background:"none",border:"none",cursor:"pointer",fontSize:14,color:"rgba(255,255,255,0.25)",padding:4}}>✎</button>
-                {isExp && (
-                  <div style={{borderTop:`1px solid ${BORD}`}}>
-                    {open.length>0 ? open.map((t,i)=>(
-                      <div key={t.id}>
-                        <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
-                        {i<open.length-1 && <div style={{height:1,background:BORD,marginLeft:58}}/>}
-                      </div>
-                    )) : (
-                      <div style={{padding:"18px",textAlign:"center"}}>
-                        <div style={{fontSize:13,color:T2}}>All done in {a.label} ✓</div>
-                      </div>
-                    )}
-                    <button onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}
-                      style={{width:"100%",padding:"12px 18px",background:"none",border:"none",
-                        borderTop:`1px solid ${BORD}`,cursor:"pointer",
-                        display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                      <span style={{fontSize:13,fontWeight:700,color:ACC}}>View all & completed</span>
-                      <span style={{fontSize:14,color:ACC}}>›</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div onClick={openNewArea} style={{borderRadius:20,marginBottom:10,padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,border:`1.5px dashed ${ACC}40`}}>
-            <div style={{width:44,height:44,borderRadius:14,background:`${ACC}15`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:`${ACC}`,flexShrink:0}}>+</div>
-            <div style={{fontSize:15,fontWeight:600,color:ACC}}>Add new area</div>
+              );
+            })}
+            {/* Add area card */}
+            <div onClick={openNewArea}
+              style={{borderRadius:20,padding:"16px 14px",cursor:"pointer",border:`1.5px dashed ${ACC}35`,minHeight:140,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6}}>
+              <div style={{fontSize:32,color:ACC,lineHeight:1}}>+</div>
+              <div style={{fontSize:13,fontWeight:700,color:ACC}}>New area</div>
+            </div>
           </div>
         </div>
       </div>
