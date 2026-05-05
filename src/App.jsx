@@ -155,21 +155,132 @@ const IS = {
   transition:"border-color 0.15s",
 };
 
+const MUTED = "#3A3A60"; // text-muted token
+
+// ─────────────────────────────────────────
+// SVG ICON SYSTEM
+// ─────────────────────────────────────────
+const Icon = {
+  grid:(sz=14)=>(
+    <svg width={sz} height={sz} viewBox="0 0 14 14">
+      <rect x="1" y="1" width="5" height="5" rx="1.5" fill="currentColor"/>
+      <rect x="8" y="1" width="5" height="5" rx="1.5" fill="currentColor" opacity=".4"/>
+      <rect x="1" y="8" width="5" height="5" rx="1.5" fill="currentColor" opacity=".4"/>
+      <rect x="8" y="8" width="5" height="5" rx="1.5" fill="currentColor" opacity=".4"/>
+    </svg>
+  ),
+  clock:(sz=14)=>(
+    <svg width={sz} height={sz} viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5"/>
+      <line x1="7" y1="7" x2="7" y2="3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="7" y1="7" x2="10" y2="7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  spark:(sz=14)=>(
+    <svg width={sz} height={sz} viewBox="0 0 14 14">
+      <path d="M7 1L8.5 5.5L13 7L8.5 8.5L7 13L5.5 8.5L1 7L5.5 5.5Z" fill="currentColor"/>
+    </svg>
+  ),
+  chevronLeft:(sz=14)=>(
+    <svg width={sz} height={sz} viewBox="0 0 14 14">
+      <polyline points="9,2 5,7 9,12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  checkCircle:(done)=>done?(
+    <svg width="14" height="14" viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="6.25" fill={GREEN} stroke="none"/>
+      <polyline points="3.5,7 6,9.5 10.5,4.5" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ):(
+    <svg width="14" height="14" viewBox="0 0 14 14">
+      <circle cx="7" cy="7" r="6.25" fill="none" stroke="#2A2A40" strokeWidth="1.5"/>
+    </svg>
+  ),
+  checkSquare:(done)=>done?(
+    <svg width="12" height="12" viewBox="0 0 12 12">
+      <rect x=".75" y=".75" width="10.5" height="10.5" rx="2.5" fill={GREEN} stroke="none"/>
+      <polyline points="2.5,6 5,8.5 9.5,3.5" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ):(
+    <svg width="12" height="12" viewBox="0 0 12 12">
+      <rect x=".75" y=".75" width="10.5" height="10.5" rx="2.5" fill="none" stroke="#2A2A40" strokeWidth="1.5"/>
+    </svg>
+  ),
+  pause:()=>(
+    <svg width="12" height="12" viewBox="0 0 12 12">
+      <rect x="1.5" y="1" width="3" height="10" rx="1" fill="currentColor"/>
+      <rect x="7.5" y="1" width="3" height="10" rx="1" fill="currentColor"/>
+    </svg>
+  ),
+  stop:()=>(
+    <svg width="12" height="12" viewBox="0 0 12 12">
+      <rect x="1" y="1" width="10" height="10" rx="2" fill="currentColor"/>
+    </svg>
+  ),
+  flame:(sz=12)=>(
+    <svg width={sz} height={sz} viewBox="0 0 12 12">
+      <path d="M6 1C4 3.5 1.5 5 1.5 8a4.5 4.5 0 009 0C10.5 5 8 3.5 6 1z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  recurring:()=>(
+    <svg width="14" height="14" viewBox="0 0 14 14">
+      <path d="M2 7A5 5 0 0112 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <polyline points="10,4.5 12,7 9.5,7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M12 7a5 5 0 01-10 0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <polyline points="4,9.5 2,7 4.5,7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  play:()=>(
+    <svg width="12" height="12" viewBox="0 0 12 12">
+      <polygon points="2,1 11,6 2,11" fill="currentColor"/>
+    </svg>
+  ),
+};
+
 // ─────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────
 
+const ProgressRing = memo(function ProgressRing({ pct, size=44, r=18, sw=4 }) {
+  const circ=2*Math.PI*r;
+  const offset=circ-Math.max(0,Math.min(1,pct/100))*circ;
+  const c=size/2;
+  return (
+    <svg width={size} height={size} style={{flexShrink:0}}>
+      <circle cx={c} cy={c} r={r} fill="none" stroke="#1A1A2A" strokeWidth={sw}/>
+      <circle cx={c} cy={c} r={r} fill="none" stroke={ACC} strokeWidth={sw}
+        strokeDasharray={circ} strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${c} ${c})`}/>
+      <text x={c} y={c+4} textAnchor="middle" fill={T1} fontSize={10} fontWeight={700}>
+        {Math.round(pct)}%
+      </text>
+    </svg>
+  );
+});
+
 const TabBar = memo(function TabBar({ tab, setTab, setView }) {
-  const items = [{id:"home",icon:"◉",label:"Tasks"},{id:"schedule",icon:"◷",label:"Schedule"},{id:"ai",icon:"✦",label:"AI"}];
+  const items = [
+    {id:"home",     iconFn:(c)=><span style={{color:c}}>{Icon.grid(22)}</span>,  label:"Tasks"},
+    {id:"schedule", iconFn:(c)=><span style={{color:c}}>{Icon.clock(22)}</span>, label:"Schedule"},
+    {id:"ai",       iconFn:(c)=><span style={{color:c}}>{Icon.spark(22)}</span>, label:"AI"},
+  ];
   return (
     <div style={TABBAR}>
-      {items.map(v => (
-        <button key={v.id} onClick={()=>{ setTab(v.id); setView(v.id); }}
-          style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:6,background:"none",border:"none",cursor:"pointer"}}>
-          <span style={{fontSize:22,lineHeight:1,color:tab===v.id?ACC:T2}}>{v.icon}</span>
-          <span style={{fontSize:10,fontWeight:tab===v.id?700:500,color:tab===v.id?ACC:T2}}>{v.label}</span>
-        </button>
-      ))}
+      {items.map(v=>{
+        const active=tab===v.id;
+        const c=active?ACC:"#2A2A45";
+        return (
+          <button key={v.id} onClick={()=>{ setTab(v.id); setView(v.id); }}
+            style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",
+              gap:3,paddingTop:4,background:"none",border:"none",cursor:"pointer",position:"relative"}}>
+            {active&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",
+              width:44,height:40,borderRadius:10,background:"#0D1A35",zIndex:0}}/>}
+            <span style={{position:"relative",zIndex:1,lineHeight:1}}>{v.iconFn(c)}</span>
+            <span style={{position:"relative",zIndex:1,fontSize:10,fontWeight:active?700:500,color:c}}>{v.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 });
@@ -247,10 +358,12 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
   );
 });
 
-const Sheet = memo(function Sheet({ children, onClose, tall }) {
+const Sheet = memo(function Sheet({ children, onClose, tall, noBlur }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",
-      alignItems:"flex-end",zIndex:200,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}
+      alignItems:"flex-end",zIndex:200,
+      ...(noBlur?{}:{backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}),
+    }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{background:"#16161F",border:`0.5px solid ${BORD}`,borderBottom:"none",
         borderRadius:"18px 18px 0 0",padding:"12px 20px 44px",width:"100%",
@@ -293,127 +406,6 @@ const ConfirmDelete = memo(function ConfirmDelete({ name, onCancel, onConfirm })
   );
 });
 
-const TaskDetailSheet = memo(function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onDelete, onSave, onClose }) {
-  const [newSub, setNewSub] = useState("");
-  if (!detailId || !editForm) return null;
-
-  const subtasks = editForm.subtasks || [];
-  const subDone  = subtasks.filter(s=>s.done).length;
-
-  function toggleSub(sid){
-    setEditForm(f=>({...f, subtasks:f.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}));
-  }
-  function deleteSub(sid){
-    setEditForm(f=>({...f, subtasks:f.subtasks.filter(s=>s.id!==sid)}));
-  }
-  function addSub(){
-    if(!newSub.trim()) return;
-    setEditForm(f=>({...f, subtasks:[...f.subtasks,{id:uid(),text:newSub.trim(),done:false}]}));
-    setNewSub("");
-  }
-
-  return (
-    <Sheet onClose={onClose} tall>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <div style={{fontSize:20,fontWeight:800,color:T1}}>Task Detail</div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={onToggle}
-            style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${editForm.done?GREEN:ACC}`,
-              background:editForm.done?"rgba(52,199,89,0.15)":`${ACC}20`,
-              color:editForm.done?GREEN:ACC,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            {editForm.done?"Undo":"Done"}
-          </button>
-          <button onClick={onDelete}
-            style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${PINK}40`,
-              background:`${PINK}15`,color:PINK,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            Delete
-          </button>
-        </div>
-      </div>
-
-      <Lbl>Title</Lbl>
-      <input value={editForm.text||""} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))}
-        style={{...IS,marginBottom:12,fontSize:17,fontWeight:600}}/>
-
-      <Lbl>Description</Lbl>
-      <textarea value={editForm.desc||""} onChange={e=>setEditForm(f=>({...f,desc:e.target.value}))}
-        placeholder="Add more context…"
-        style={{...IS,resize:"none",minHeight:72,marginBottom:12,lineHeight:1.5}}/>
-
-      <Lbl>Notes</Lbl>
-      <textarea value={editForm.notes||""} onChange={e=>setEditForm(f=>({...f,notes:e.target.value}))}
-        placeholder="Links, references, anything…"
-        style={{...IS,resize:"none",minHeight:52,marginBottom:16,lineHeight:1.5}}/>
-
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <Lbl>Subtasks {subtasks.length>0?`(${subDone}/${subtasks.length})`:""}</Lbl>
-      </div>
-      {subtasks.length>0 && (
-        <div style={{background:"rgba(255,255,255,0.05)",borderRadius:14,overflow:"hidden",marginBottom:10,border:`1px solid ${BORD}`}}>
-          {subtasks.map((s,i)=>(
-            <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<subtasks.length-1?`1px solid ${BORD}`:"none"}}>
-              <button onClick={()=>toggleSub(s.id)}
-                style={{width:22,height:22,borderRadius:11,border:s.done?"none":`2px solid ${ACC}50`,
-                  background:s.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",
-                  display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {s.done && <span style={{color:"#fff",fontSize:11}}>✓</span>}
-              </button>
-              <div style={{flex:1,fontSize:14,color:s.done?"rgba(255,255,255,0.3)":T1,textDecoration:s.done?"line-through":"none",lineHeight:1.3}}>{s.text}</div>
-              <button onClick={()=>deleteSub(s.id)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
-            </div>
-          ))}
-        </div>
-      )}
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        <input value={newSub} onChange={e=>setNewSub(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&addSub()}
-          placeholder="Add a subtask…"
-          style={{...IS,flex:1,padding:"11px 14px",fontSize:14}}/>
-        <button onClick={addSub} disabled={!newSub.trim()}
-          style={{padding:"11px 16px",borderRadius:14,border:"none",
-            background:newSub.trim()?ACC:"rgba(255,255,255,0.1)",
-            color:newSub.trim()?"#fff":T2,fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-          Add
-        </button>
-      </div>
-
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div>
-          <Lbl>Area</Lbl>
-          <select value={editForm.area||"inbox"} onChange={e=>setEditForm(f=>({...f,area:e.target.value}))} style={IS}>
-            {areas.map(a=><option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <Lbl>Priority</Lbl>
-          <select value={editForm.priority||"med"} onChange={e=>setEditForm(f=>({...f,priority:e.target.value}))} style={IS}>
-            <option value="high">Urgent</option>
-            <option value="med">Normal</option>
-            <option value="low">Later</option>
-          </select>
-        </div>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
-        <div>
-          <Lbl>Time</Lbl>
-          <input type="time" value={editForm.time||""} onChange={e=>setEditForm(f=>({...f,time:e.target.value}))} style={IS}/>
-        </div>
-        <div>
-          <Lbl>Duration (min)</Lbl>
-          <input type="number" value={editForm.dur||""} onChange={e=>setEditForm(f=>({...f,dur:+e.target.value}))} style={IS}/>
-        </div>
-      </div>
-      <Lbl>Due date</Lbl>
-      <input type="date" value={editForm.due||""} onChange={e=>setEditForm(f=>({...f,due:e.target.value}))}
-        style={{...IS,marginBottom:24}}/>
-      <button onClick={onSave}
-        style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:ACC,
-          color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>
-        Save changes
-      </button>
-    </Sheet>
-  );
-});
 
 const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, areaForm, setAreaForm, onSave, onDeleteRequest }) {
   if (!show) return null;
@@ -722,6 +714,109 @@ function LoginScreen() {
 }
 
 // ─────────────────────────────────────────
+// BRAIN DUMP SHEET
+// ─────────────────────────────────────────
+function BrainDumpSheet({ onClose, onAddTasks, getToken }) {
+  const [text,    setText]    = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result,  setResult]  = useState(null);
+  const [err,     setErr]     = useState("");
+
+  async function submit() {
+    if(!text.trim()) return;
+    setLoading(true); setErr(""); setResult(null);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/brain-dump",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+        body:JSON.stringify({prompt:text}),
+      });
+      if(!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setResult(data.tasks||[]);
+    } catch(e) {
+      setErr("Could not parse tasks. Try again.");
+      console.error(e);
+    }
+    setLoading(false);
+  }
+
+  function addAll() {
+    onAddTasks(result||[]);
+    onClose();
+  }
+
+  return (
+    <Sheet onClose={onClose} tall noBlur>
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+        <div style={{background:"#1A0D35",border:`0.5px solid ${PURPLE}`,borderRadius:8,
+          padding:"4px 8px",display:"inline-flex",alignItems:"center",gap:4}}>
+          <span style={{color:PURPLE,lineHeight:1,display:"flex"}}>{Icon.spark(9)}</span>
+          <span style={{fontSize:9,fontWeight:600,color:PURPLE}}>AI</span>
+        </div>
+        <span style={{fontSize:12,fontWeight:700,color:T1}}>Brain dump</span>
+      </div>
+
+      {/* Textarea */}
+      <textarea value={text} onChange={e=>setText(e.target.value)}
+        placeholder="Just type everything on your mind…"
+        style={{...IS,minHeight:80,resize:"none",lineHeight:1.6,
+          color:text?T1:"#4A4A70",marginBottom:12}}
+        onFocus={e=>e.target.style.borderColor=ACC}
+        onBlur={e=>e.target.style.borderColor=BORD2}/>
+
+      {/* Error */}
+      {err&&<div style={{fontSize:12,color:PINK,marginBottom:8}}>{err}</div>}
+
+      {/* Result card or submit button */}
+      {result ? (
+        <>
+          <div style={{background:"#0D1A35",border:`0.5px solid ${ACC}`,borderRadius:10,
+            padding:"10px 12px",marginBottom:12}}>
+            {loading ? (
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+                <div className="ai-spinner" style={{width:16,height:16,borderWidth:2}}/>
+                <span style={{fontSize:11,color:T2}}>Parsing your brain dump…</span>
+              </div>
+            ) : (
+              <>
+                <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:8}}>
+                  <span style={{color:ACC,display:"flex"}}>{Icon.spark(9)}</span>
+                  <span style={{fontSize:9,fontWeight:600,color:ACC}}>Tasks created</span>
+                </div>
+                {result.map((t,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
+                    <div style={{width:5,height:5,borderRadius:3,background:ACC,flexShrink:0}}/>
+                    <span style={{fontSize:11,color:"#A0B0E0"}}>{t}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          {!loading&&(
+            <button onClick={addAll}
+              style={{width:"100%",padding:"11px",borderRadius:9,border:"none",
+                background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              Add all to Today
+            </button>
+          )}
+        </>
+      ) : (
+        <button onClick={submit} disabled={!text.trim()||loading}
+          style={{width:"100%",padding:"11px",borderRadius:9,border:"none",
+            background:text.trim()&&!loading?ACC:"rgba(255,255,255,0.06)",
+            color:text.trim()&&!loading?"#fff":T2,
+            fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          {loading?"Parsing…":"Parse tasks"}
+        </button>
+      )}
+    </Sheet>
+  );
+}
+
+// ─────────────────────────────────────────
 // CHANGE PASSWORD SHEET
 // ─────────────────────────────────────────
 function ChangePasswordSheet({ onClose }) {
@@ -918,6 +1013,15 @@ export default function App() {
   const [syncEnabled,   setSyncEnabled]   = useState(false);
   const [showProfile,   setShowProfile]   = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
+  const [showBrainDump, setShowBrainDump] = useState(false);
+
+  // ── Focus timer ──
+  const [focusTaskId,   setFocusTaskId]   = useState(null);
+  const [focusTimeLeft, setFocusTimeLeft] = useState(1500);
+  const [focusRunning,  setFocusRunning]  = useState(false);
+  const [focusSessions, setFocusSessions] = useState(0);
+  const [focusStreak,   setFocusStreak]   = useState(0);
+  const [focusTodayMin, setFocusTodayMin] = useState(0);
 
   const tasksRef      = useRef(tasks);
   const editFormRef   = useRef(editForm);
@@ -925,6 +1029,7 @@ export default function App() {
   const newTRef       = useRef(newT);
   const messagesRef   = useRef(messages);
   const getTokenRef   = useRef(getToken);
+  const prevViewRef   = useRef("home");
   useEffect(()=>{ tasksRef.current      = tasks;    },[tasks]);
   useEffect(()=>{ editFormRef.current   = editForm; },[editForm]);
   useEffect(()=>{ activeAreaRef.current = activeArea; },[activeArea]);
@@ -965,6 +1070,30 @@ export default function App() {
     });
   },[isSignedIn,userId]);
 
+  // ── Focus timer interval ──
+  useEffect(()=>{
+    if(!focusRunning) return;
+    const id=setInterval(()=>{
+      setFocusTimeLeft(t=>{
+        if(t<=1){
+          clearInterval(id);
+          setFocusRunning(false);
+          setFocusSessions(s=>s+1);
+          setFocusTodayMin(m=>m+25);
+          setFocusStreak(s=>s+1);
+          setTasks(ts=>ts.map(t=>{
+            if(t.id!==focusTaskId) return t;
+            const subs=t.subtasks||[];
+            return subs.length>0&&subs.every(s=>s.done)?{...t,done:true}:t;
+          }));
+          return 1500;
+        }
+        return t-1;
+      });
+    },1000);
+    return ()=>clearInterval(id);
+  },[focusRunning,focusTaskId]);
+
   // ── Debounced sync to Neon on change ──
   useEffect(()=>{
     if(!isSignedIn||!syncEnabled) return;
@@ -1000,15 +1129,20 @@ export default function App() {
     if(!t) return;
     setEditForm({...t});
     setDetailId(id);
+    setView(v=>{ prevViewRef.current=v; return "task-detail"; });
   },[]);
 
   const saveDetail  = useCallback(()=>{
     const f=editFormRef.current;
     setTasks(ts=>ts.map(t=>t.id===f.id?{...f}:t));
     setDetailId(null); setEditForm(null);
+    setView(prevViewRef.current||"home");
   },[]);
 
-  const closeDetail = useCallback(()=>{ setDetailId(null); setEditForm(null); },[]);
+  const closeDetail = useCallback(()=>{
+    setDetailId(null); setEditForm(null);
+    setView(prevViewRef.current||"home");
+  },[]);
 
   const addManual   = useCallback(()=>{
     const n=newTRef.current;
@@ -1121,12 +1255,6 @@ export default function App() {
   const detailToggle = useCallback(()=>{ toggle(detailId); closeDetail(); },[detailId,toggle,closeDetail]);
   const detailDelete = useCallback(()=>delTask(detailId),[detailId,delTask]);
 
-  const sharedDetail = (
-    <TaskDetailSheet
-      detailId={detailId} editForm={editForm} setEditForm={setEditForm} areas={areas}
-      onToggle={detailToggle} onDelete={detailDelete} onSave={saveDetail} onClose={closeDetail}
-    />
-  );
   const sharedTab = <TabBar tab={tab} setTab={setTab} setView={setView}/>;
   const sharedAreaMgr = (
     <AreaMgrSheet
@@ -1158,10 +1286,15 @@ export default function App() {
         {/* ── Header ── */}
         <div style={{padding:"52px 20px 0"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-            <div>
-              <div style={{fontSize:13,color:T2,marginBottom:2}}>{TODAY_SHORT}</div>
-              <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}{displayName?`, ${displayName}.`:`.`}</div>
+            {/* Left: progress ring + greeting */}
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <ProgressRing pct={todayTasks.length>0?Math.round(todayTasks.filter(t=>t.done).length/todayTasks.length*100):0}/>
+              <div>
+                <div style={{fontSize:18,fontWeight:700,color:T1,lineHeight:1.2}}>{greet()}{displayName?`, ${displayName}`:""}</div>
+                <div style={{fontSize:10,color:MUTED,marginTop:3}}>{todayTasks.length} tasks · {todayTasks.filter(t=>!t.done).length} left today</div>
+              </div>
             </div>
+            {/* Right: account + add */}
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <button onClick={()=>setShowProfile(true)}
                 style={{padding:"6px 14px",borderRadius:20,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:T2}}>
@@ -1172,42 +1305,60 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── Brain dump button ── */}
+          <button onClick={()=>setShowBrainDump(true)}
+            style={{width:"100%",background:"#0D1A35",border:`0.5px solid ${ACC}`,borderRadius:10,
+              padding:"11px 14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:16}}>
+            <div style={{width:20,height:20,borderRadius:10,background:ACC,display:"flex",
+              alignItems:"center",justifyContent:"center",flexShrink:0,color:"#fff",fontWeight:700,fontSize:14}}>+</div>
+            <span style={{fontSize:11,fontWeight:500,color:ACC}}>Brain dump…</span>
+          </button>
+
           {/* ── Today card with task list ── */}
           <div style={{...gl(),borderRadius:20,marginBottom:20,overflow:"hidden"}}>
-            <div style={{padding:"14px 18px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontSize:13,fontWeight:700,color:T1}}>Today</div>
+            <div style={{padding:"12px 16px 8px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:12,fontWeight:700,color:T1,letterSpacing:.5}}>Today</div>
               <div style={{display:"flex",gap:10}}>
-                {urgent.length>0&&<span style={{fontSize:12,fontWeight:700,color:PINK}}>{urgent.length} urgent</span>}
-                {scheduled.length>0&&<span style={{fontSize:12,fontWeight:700,color:ACC}}>{scheduled.length} scheduled</span>}
+                {urgent.length>0&&<span style={{fontSize:11,fontWeight:700,color:PINK}}>{urgent.length} urgent</span>}
+                {scheduled.length>0&&<span style={{fontSize:11,fontWeight:700,color:ACC}}>{scheduled.length} scheduled</span>}
               </div>
             </div>
             {todayTasks.length>0 ? todayTasks.map((t,i)=>{
               const a=getArea(areas,t.area);
-              const aIdx=areas.findIndex(ar=>ar.id===t.area);
-              const aTheme=AREA_THEMES[aIdx%AREA_THEMES.length];
               return (
-                <div key={t.id}>
-                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px"}}>
+                <div key={t.id} style={{opacity:t.done?0.45:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,
+                    padding:"9px 16px",background:i%2===0?SURF:"transparent",
+                    borderRadius:i===0?"0":"none"}}>
+                    {/* SVG circle checkbox */}
                     <button onClick={()=>toggle(t.id)}
-                      style={{width:22,height:22,borderRadius:11,border:t.done?"none":`2px solid ${ACC}60`,background:t.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      {t.done&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
+                      style={{background:"none",border:"none",cursor:"pointer",padding:0,
+                        display:"flex",alignItems:"center",flexShrink:0}}>
+                      {Icon.checkCircle(t.done)}
                     </button>
+                    {/* Task text + meta */}
                     <div style={{flex:1,minWidth:0}} onClick={()=>openDetail(t.id)}>
-                      <div style={{fontSize:14,fontWeight:600,color:t.done?"rgba(255,255,255,0.3)":T1,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
-                      <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
-                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:aTheme.accent+"20",color:aTheme.accent}}>{a.label}</span>
-                        {t.time&&<span style={{fontSize:10,color:T2}}>{fmt(t.time)}</span>}
-                        {t.priority==="high"&&!t.time&&<span style={{fontSize:10,fontWeight:700,color:PINK}}>Urgent</span>}
-                      </div>
+                      <div style={{fontSize:11,fontWeight:500,color:"#D0D8FF",
+                        textDecoration:t.done?"line-through":"none",
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.text}</div>
+                      <div style={{fontSize:9,color:MUTED,marginTop:1}}>{a.label}</div>
                     </div>
-                    <span onClick={()=>openDetail(t.id)} style={{color:"rgba(255,255,255,0.2)",fontSize:14,cursor:"pointer",flexShrink:0}}>›</span>
+                    {/* Tag pill */}
+                    {t.priority==="high"&&!t.done&&(
+                      <span style={{fontSize:9,fontWeight:600,padding:"2px 7px",borderRadius:999,
+                        background:"#2E0D0D",color:RED,flexShrink:0}}>Urgent</span>
+                    )}
+                    {t.time&&!t.done&&(
+                      <span style={{fontSize:9,fontWeight:600,padding:"2px 7px",borderRadius:999,
+                        background:"#0D1A35",color:ACC,flexShrink:0}}>{fmt(t.time)}</span>
+                    )}
                   </div>
-                  {i<todayTasks.length-1&&<div style={{height:1,background:BORD,marginLeft:52}}/>}
+                  {i<todayTasks.length-1&&<div style={{height:1,background:BORD,marginLeft:44}}/>}
                 </div>
               );
             }) : (
               <div style={{padding:"16px 18px 18px",fontSize:13,color:T2}}>
-                {totalOpen===0?"All caught up — nothing open today.":"No urgent or scheduled tasks. Add one with +"}
+                {totalOpen===0?"All caught up — nothing open today.":"No urgent or scheduled tasks."}
               </div>
             )}
           </div>
@@ -1333,7 +1484,6 @@ export default function App() {
         </div>
       </div>
       {sharedTab}
-      {sharedDetail}
       {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
       {showProfile && !showChangePw && (
@@ -1344,8 +1494,217 @@ export default function App() {
         />
       )}
       {showChangePw && <ChangePasswordSheet onClose={()=>{ setShowChangePw(false); setShowProfile(false); }}/>}
+      {showBrainDump && (
+        <BrainDumpSheet
+          onClose={()=>setShowBrainDump(false)}
+          getToken={getToken}
+          onAddTasks={(taskTexts)=>{
+            setTasks(ts=>[...ts,...taskTexts.map(text=>({
+              id:uid(),text,area:"inbox",done:false,priority:"med",
+              due:"",time:"",dur:30,desc:"",notes:"",subtasks:[],
+            }))]);
+          }}
+        />
+      )}
     </div>
   );}
+
+  // ══════════════════════════════════
+  // TASK DETAIL
+  // ══════════════════════════════════
+  if(view==="task-detail"){
+    if(!detailId||!editForm) return null;
+    const td=editForm;
+    const tdArea=getArea(areas,td.area);
+    const tdIdx=areas.findIndex(a=>a.id===td.area);
+    const tdT=AREA_THEMES[tdIdx%AREA_THEMES.length];
+    const tdSubs=td.subtasks||[];
+    const tdSubDone=tdSubs.filter(s=>s.done).length;
+    function toggleSubLocal(sid){
+      setEditForm(f=>({...f,subtasks:f.subtasks.map(s=>s.id===sid?{...s,done:!s.done}:s)}));
+    }
+    return (
+      <div style={PAGE}>
+        <div style={{padding:"52px 20px 140px"}}>
+          {/* Back nav */}
+          <button onClick={closeDetail}
+            style={{display:"flex",alignItems:"center",gap:6,background:"none",border:"none",
+              cursor:"pointer",color:ACC,marginBottom:20,padding:0}}>
+            <span style={{color:ACC,display:"flex"}}>{Icon.chevronLeft(14)}</span>
+            <span style={{fontSize:13,fontWeight:600,color:ACC}}>Back</span>
+          </button>
+
+          {/* Title */}
+          <input value={td.text||""} onChange={e=>setEditForm(f=>({...f,text:e.target.value}))}
+            style={{...IS,fontSize:17,fontWeight:700,marginBottom:12}}/>
+
+          {/* Meta */}
+          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14}}>
+            {td.due&&<span style={{fontSize:11,color:T2}}>Due {td.due}</span>}
+            {td.time&&<span style={{fontSize:11,color:T2}}>{fmt(td.time)}{td.dur?` · ${td.dur}m`:""}</span>}
+            <span style={{display:"flex",color:T2}}>{Icon.recurring()}</span>
+          </div>
+
+          {/* Tag pills */}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
+            <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,
+              background:tdT.accent+"20",color:tdT.accent}}>{tdArea.label}</span>
+            {td.priority==="high"&&(
+              <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,
+                background:"#2E0D0D",color:RED}}>Urgent</span>
+            )}
+            {td.priority==="med"&&(
+              <span style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,
+                background:"#0D1A35",color:ACC}}>Normal</span>
+            )}
+          </div>
+
+          {/* Subtasks */}
+          {tdSubs.length>0&&(
+            <div style={{marginBottom:20}}>
+              <Lbl>Subtasks ({tdSubDone}/{tdSubs.length})</Lbl>
+              {tdSubs.map(s=>(
+                <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
+                  background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
+                  <button onClick={()=>toggleSubLocal(s.id)}
+                    style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex"}}>
+                    {Icon.checkSquare(s.done)}
+                  </button>
+                  <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
+                    textDecoration:s.done?"line-through":"none",flex:1}}>{s.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Description */}
+          <Lbl>Description</Lbl>
+          <textarea value={td.desc||""} onChange={e=>setEditForm(f=>({...f,desc:e.target.value}))}
+            placeholder="Add more context…"
+            style={{...IS,resize:"none",minHeight:60,marginBottom:12,lineHeight:1.5}}/>
+
+          {/* Action buttons */}
+          <div style={{display:"flex",gap:10,marginBottom:12}}>
+            <button onClick={()=>{ detailToggle(); }}
+              style={{flex:1,padding:"13px",borderRadius:14,border:`0.5px solid ${td.done?GREEN:ACC}`,
+                background:td.done?GREEN+"15":ACC+"15",color:td.done?GREEN:ACC,
+                fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              {td.done?"Undo":"Done"}
+            </button>
+            <button onClick={()=>detailDelete()}
+              style={{flex:1,padding:"13px",borderRadius:14,border:`0.5px solid ${RED}40`,
+                background:RED+"10",color:RED,fontSize:14,fontWeight:700,cursor:"pointer"}}>
+              Delete
+            </button>
+          </div>
+          <button onClick={saveDetail}
+            style={{width:"100%",padding:"15px",borderRadius:16,border:"none",background:ACC,
+              color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
+            Save changes
+          </button>
+        </div>
+
+        {/* Focus timer bar */}
+        <div style={{position:"fixed",bottom:60,left:"50%",transform:"translateX(-50%)",
+          width:"100%",maxWidth:MAX_W,background:SURF,borderTop:`0.5px solid ${BORD}`,
+          padding:"12px 20px",display:"flex",alignItems:"center",gap:12,boxSizing:"border-box",zIndex:90}}>
+          <span style={{color:T2,display:"flex"}}>{Icon.clock(18)}</span>
+          <span style={{fontSize:15,fontWeight:700,color:T1}}>
+            {String(Math.floor(focusTimeLeft/60)).padStart(2,"0")}:{String(focusTimeLeft%60).padStart(2,"0")}
+          </span>
+          <button onClick={()=>{
+            setFocusTaskId(detailId);
+            setFocusTimeLeft(1500);
+            prevViewRef.current="task-detail";
+            setView("focus");
+          }}
+            style={{marginLeft:"auto",padding:"9px 18px",borderRadius:20,border:"none",
+              background:ACC,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            Start focus
+          </button>
+        </div>
+        {sharedTab}
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════
+  // FOCUS TIMER
+  // ══════════════════════════════════
+  if(view==="focus"){
+    const focusTask=tasks.find(t=>t.id===focusTaskId);
+    const mins=String(Math.floor(focusTimeLeft/60)).padStart(2,"0");
+    const secs=String(focusTimeLeft%60).padStart(2,"0");
+    const pct=((1500-focusTimeLeft)/1500)*100;
+    const R=34, SZ=80, CIRC=2*Math.PI*R;
+    const offset=CIRC-(pct/100)*CIRC;
+    return (
+      <div style={{...PAGE,display:"flex",flexDirection:"column",alignItems:"center",
+        justifyContent:"center",padding:"40px 20px",minHeight:"100vh"}}>
+        <div style={{fontSize:9,fontWeight:700,color:MUTED,letterSpacing:"0.1em",
+          textTransform:"uppercase",marginBottom:32}}>Focus mode</div>
+
+        {/* Large progress ring */}
+        <div style={{position:"relative",width:SZ,height:SZ,marginBottom:20}}>
+          <svg width={SZ} height={SZ}>
+            <circle cx={SZ/2} cy={SZ/2} r={R} fill="none" stroke="#1A1A2A" strokeWidth={5}/>
+            <circle cx={SZ/2} cy={SZ/2} r={R} fill="none" stroke={ACC} strokeWidth={5}
+              strokeDasharray={CIRC} strokeDashoffset={offset}
+              strokeLinecap="round"
+              transform={`rotate(-90 ${SZ/2} ${SZ/2})`}/>
+          </svg>
+          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:18,fontWeight:700,color:T1}}>
+            {mins}:{secs}
+          </div>
+        </div>
+
+        {/* Task chip */}
+        {focusTask&&(
+          <div style={{background:SURF,border:`0.5px solid ${BORD}`,borderRadius:20,
+            padding:"6px 16px",fontSize:11,color:T2,marginBottom:32,
+            maxWidth:"75%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",textAlign:"center"}}>
+            {focusTask.text}
+          </div>
+        )}
+
+        {/* Controls */}
+        <div style={{display:"flex",gap:16,marginBottom:40}}>
+          <button onClick={()=>setFocusRunning(r=>!r)}
+            style={{width:56,height:56,borderRadius:28,background:SURF,
+              border:`0.5px solid ${BORD}`,cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",color:T2}}>
+            {focusRunning?Icon.pause():Icon.play()}
+          </button>
+          <button onClick={()=>{ setFocusRunning(false); setFocusTimeLeft(1500); setView(prevViewRef.current||"home"); }}
+            style={{width:56,height:56,borderRadius:28,background:`${RED}15`,
+              border:`0.5px solid ${RED}40`,cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",color:RED}}>
+            {Icon.stop()}
+          </button>
+        </div>
+
+        {/* Streak stats */}
+        <div style={{display:"flex",gap:10,width:"100%",maxWidth:320}}>
+          {[
+            {label:"Sessions",value:focusSessions,   icon:Icon.clock(14)},
+            {label:"Today",   value:`${focusTodayMin}m`,icon:Icon.clock(14)},
+            {label:"Streak",  value:focusStreak,     icon:Icon.flame(14)},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,background:SURF,border:`0.5px solid ${BORD}`,
+              borderRadius:12,padding:"10px 8px",textAlign:"center"}}>
+              <div style={{display:"flex",justifyContent:"center",marginBottom:4,color:T2}}>
+                {s.icon}
+              </div>
+              <div style={{fontSize:18,fontWeight:800,color:T1}}>{s.value}</div>
+              <div style={{fontSize:9,color:MUTED,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        {sharedTab}
+      </div>
+    );
+  }
 
   // ══════════════════════════════════
   // AREA DETAIL
@@ -1419,8 +1778,7 @@ export default function App() {
           </div>
         </div>
         {sharedTab}
-        {sharedDetail}
-        {sharedAreaMgr}
+          {sharedAreaMgr}
         {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
       </div>
     );
@@ -1492,8 +1850,7 @@ export default function App() {
           </div>
         </div>
         {sharedTab}
-        {sharedDetail}
-      </div>
+        </div>
     );
   }
 
