@@ -1,15 +1,46 @@
+/* ── Void x Paper — TASK APP UI KIT ── */
+
+:root {
+  --bg-base:        #0C0C14;
+  --bg-surface:     #0E0E18;
+  --bg-elevated:    #13131E;
+  --bg-highlight:   #16161F;
+  --accent-blue:    #5B8FFF;
+  --accent-purple:  #C87EFF;
+  --accent-gold:    #E0A040;
+  --accent-green:   #22C97A;
+  --accent-red:     #F05050;
+  --tint-blue:      #0D1A35;
+  --tint-purple:    #1A0D35;
+  --tint-gold:      #2A1A05;
+  --tint-green:     #0A2E1A;
+  --tint-red:       #2E0D0D;
+  --text-primary:   #E0E8FF;
+  --text-secondary: #A0A8C0;
+  --text-muted:     #3A3A60;
+  --border-default: #1E1E30;
+  --border-subtle:  #2A2A3A;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --font: -apple-system, 'SF Pro Display', BlinkMacSystemFont, sans-serif;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html, body {
   height: 100%;
   overflow: hidden;
-  background: #0D0D0F;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  background: #0C0C14;
+  color: #E0E8FF;
+  font-family: var(--font);
+  line-height: 1.5;
   color-scheme: dark;
 }
 
@@ -20,56 +51,52 @@ html, body {
   overscroll-behavior: none;
 }
 
-/* Desktop: center the app frame */
+/* Desktop: centered app frame */
 @media (min-width: 520px) {
-  html, body {
-    background: #070709;
-  }
+  html, body { background: #09090F; }
   #root {
     display: flex;
     justify-content: center;
-    background: #070709;
+    background: #09090F;
   }
   #root > div {
     max-width: 480px;
     width: 100%;
-    border-left: 1px solid rgba(255,255,255,0.06);
-    border-right: 1px solid rgba(255,255,255,0.06);
-    box-shadow: 0 0 80px rgba(0,0,0,0.6);
+    border-left: 0.5px solid #1E1E30;
+    border-right: 0.5px solid #1E1E30;
+    box-shadow: 0 0 80px rgba(0,0,0,0.7);
   }
 }
 
-/* Remove tap highlight on mobile */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
+/* Remove tap highlight */
+* { -webkit-tap-highlight-color: transparent; }
 
-/* Prevent text selection on buttons */
-button {
-  -webkit-user-select: none;
-  user-select: none;
-}
+button { -webkit-user-select: none; user-select: none; }
 
 input, textarea, select {
-  font-family: -apple-system, "SF Pro Display", system-ui, sans-serif;
+  font-family: var(--font);
+  color-scheme: dark;
 }
 
+/* ── AI loading animations ── */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
+  50%       { opacity: 0.3; }
 }
 
 .ai-spinner {
-  width: 36px; height: 36px; border-radius: 50%;
-  border: 3px solid rgba(108,92,231,0.15);
-  border-top-color: #6C5CE7;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 2.5px solid #1E1E30;
+  border-top-color: #5B8FFF;
   animation: spin 0.9s linear infinite;
 }
+
 .ai-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: #6C5CE7;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #5B8FFF;
   animation: pulse 1.2s ease-in-out infinite;
 }
 .ai-dot:nth-child(2) { animation-delay: 0.2s; }

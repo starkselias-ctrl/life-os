@@ -1,12 +1,18 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useAuth, useUser, useSignIn, useSignUp } from "@clerk/clerk-react";
 
-const ACC  = "#2B6AFF";
-const PINK = "#E84393";
-const SURF = "#18181D";
-const BORD = "rgba(255,255,255,0.08)";
-const T1   = "#FFFFFF";
-const T2   = "#8E8E9A";
+/* ── Void x Paper tokens ── */
+const ACC    = "#5B8FFF";   // electric blue
+const PINK   = "#E84393";   // urgent pink
+const RED    = "#F05050";   // destructive red
+const PURPLE = "#C87EFF";   // purple accent
+const GOLD   = "#E0A040";   // gold accent
+const GREEN  = "#22C97A";   // success green
+const SURF   = "#13131E";   // elevated surface
+const BORD   = "#1E1E30";   // default border
+const BORD2  = "#2A2A3A";   // subtle border
+const T1     = "#E0E8FF";   // primary text
+const T2     = "#A0A8C0";   // secondary text
 
 // Generic starter areas shown to every new user
 const DEFAULT_AREAS = [
@@ -29,7 +35,18 @@ const TODAY_LONG  = new Date().toLocaleDateString("en-US",{weekday:"long",month:
 const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
 const today       = new Date();
 
-const CARD_COLORS = ["#2B6AFF","#E84393","#F5A623","#00B894","#FF6348","#A855F7","#0EA5E9","#636370"];
+// Area card themes — tint bg + matching accent
+const AREA_THEMES = [
+  {bg:"#0D1A35",accent:ACC,   border:"#1A2840"},
+  {bg:"#1A0D35",accent:PURPLE,border:"#28154A"},
+  {bg:"#2A1A05",accent:GOLD,  border:"#3A2510"},
+  {bg:"#0A2E1A",accent:GREEN, border:"#103D24"},
+  {bg:"#2E0D0D",accent:RED,   border:"#3D1A1A"},
+  {bg:"#0A1A2E",accent:ACC,   border:"#10253A"},
+  {bg:"#1A1A2A",accent:T2,    border:"#252535"},
+  {bg:"#140D1A",accent:PURPLE,border:"#201528"},
+];
+
 function greet(){
   const now=new Date(), h=now.getHours(), day=now.getDay();
   const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -40,11 +57,11 @@ function greet(){
 }
 
 const EC = [
-  {bg:"rgba(255,200,80,0.18)",border:"#F5A623"},
-  {bg:`rgba(43,106,255,0.18)`,border:ACC},
-  {bg:"rgba(80,220,180,0.18)",border:"#00B894"},
-  {bg:"rgba(232,67,147,0.18)",border:PINK},
-  {bg:"rgba(100,180,255,0.18)",border:"#3D9EFF"},
+  {bg:"#0D1A35",border:ACC},
+  {bg:"#2A1A05",border:GOLD},
+  {bg:"#0A2E1A",border:GREEN},
+  {bg:"#1A0D35",border:PURPLE},
+  {bg:"#2E0D0D",border:RED},
 ];
 
 const AI_SYS = `You are the AI brain of a personal life OS for Elias — Salesforce consultant who just relocated from Austin TX to Amsterdam. DAFT visa applicant, self-employed. Today: ${TODAY_LONG}.
@@ -98,22 +115,20 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function load(key,fb){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fb; }catch{ return fb; } }
 function save(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch(e){ void e; } }
 
-const gl = (bl=20) => ({
+const gl = () => ({
   background:SURF,
-  backdropFilter:`blur(${bl}px)`,
-  WebkitBackdropFilter:`blur(${bl}px)`,
-  border:`1px solid ${BORD}`,
+  border:`0.5px solid ${BORD}`,
 });
 
 const MAX_W = 480;
 
 const PAGE = {
-  fontFamily:"system-ui,sans-serif",
+  fontFamily:"-apple-system,'SF Pro Display',BlinkMacSystemFont,sans-serif",
   width:"100%",
   maxWidth:MAX_W,
   margin:"0 auto",
   minHeight:"100vh",
-  background:"#0D0D0F",
+  background:"#0C0C14",
   overflowX:"hidden",
   overflowY:"auto",
   WebkitOverflowScrolling:"touch",
@@ -124,21 +139,20 @@ const TABBAR = {
   position:"fixed",bottom:0,
   left:"50%",transform:"translateX(-50%)",
   width:"100%",maxWidth:MAX_W,
-  background:"#111116",
-  backdropFilter:"blur(30px)",
-  WebkitBackdropFilter:"blur(30px)",
-  borderTop:`1px solid ${BORD}`,
+  background:"#0E0E18",
+  borderTop:`0.5px solid ${BORD}`,
   display:"flex",zIndex:100,
   paddingBottom:"calc(env(safe-area-inset-bottom) + 6px)",
   paddingTop:6,
 };
 
 const IS = {
-  width:"100%",padding:"13px 16px",borderRadius:14,
-  border:`1px solid ${BORD}`,
-  background:"rgba(255,255,255,0.07)",
-  fontSize:16,fontFamily:"inherit",outline:"none",
+  width:"100%",padding:"13px 16px",borderRadius:12,
+  border:`0.5px solid ${BORD2}`,
+  background:SURF,
+  fontSize:15,fontFamily:"inherit",outline:"none",
   color:T1,boxSizing:"border-box",display:"block",
+  transition:"border-color 0.15s",
 };
 
 // ─────────────────────────────────────────
@@ -170,7 +184,7 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
       <div style={{display:"flex",alignItems:"center",gap:14,padding:"15px 18px",minHeight:56}}>
         <button onClick={()=>onToggle(t.id)}
           style={{width:26,height:26,borderRadius:13,border:t.done?"none":`2px solid ${ACC}60`,
-            background:t.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",
+            background:t.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",
             display:"flex",alignItems:"center",justifyContent:"center"}}>
           {t.done && <span style={{color:"#fff",fontSize:13}}>✓</span>}
         </button>
@@ -188,7 +202,7 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
           {hasSubs && !t.done && (
             <div style={{marginTop:6,height:2,borderRadius:1,background:"rgba(255,255,255,0.1)"}}>
               <div style={{height:2,borderRadius:1,transition:"width 0.3s",
-                background:subDone===subs.length?"#34C759":ACC,
+                background:subDone===subs.length?GREEN:ACC,
                 width:`${subs.length?subDone/subs.length*100:0}%`}}/>
             </div>
           )}
@@ -213,7 +227,7 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
               <button onClick={()=>onToggleSub(t.id,s.id)}
                 style={{width:20,height:20,borderRadius:10,
                   border:s.done?"none":`1.5px solid ${ACC}60`,
-                  background:s.done?"#34C759":"transparent",
+                  background:s.done?GREEN:"transparent",
                   flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {s.done && <span style={{color:"#fff",fontSize:10}}>✓</span>}
               </button>
@@ -238,10 +252,10 @@ const Sheet = memo(function Sheet({ children, onClose, tall }) {
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",
       alignItems:"flex-end",zIndex:200,backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:"#1C1C24",border:`1px solid ${BORD}`,borderBottom:"none",
-        borderRadius:"20px 20px 0 0",padding:"12px 20px 44px",width:"100%",
+      <div style={{background:"#16161F",border:`0.5px solid ${BORD}`,borderBottom:"none",
+        borderRadius:"18px 18px 0 0",padding:"12px 20px 44px",width:"100%",
         boxSizing:"border-box",maxHeight:tall?"93vh":"auto",overflowY:"auto"}}>
-        <div style={{width:36,height:5,borderRadius:3,background:"rgba(255,255,255,0.2)",margin:"0 auto 20px"}}/>
+        <div style={{width:36,height:4,borderRadius:3,background:BORD,margin:"0 auto 20px"}}/>
         {children}
       </div>
     </div>
@@ -304,9 +318,9 @@ const TaskDetailSheet = memo(function TaskDetailSheet({ detailId, editForm, setE
         <div style={{fontSize:20,fontWeight:800,color:T1}}>Task Detail</div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={onToggle}
-            style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${editForm.done?"#34C759":ACC}`,
+            style={{padding:"7px 14px",borderRadius:20,border:`1.5px solid ${editForm.done?GREEN:ACC}`,
               background:editForm.done?"rgba(52,199,89,0.15)":`${ACC}20`,
-              color:editForm.done?"#34C759":ACC,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              color:editForm.done?GREEN:ACC,fontSize:13,fontWeight:700,cursor:"pointer"}}>
             {editForm.done?"Undo":"Done"}
           </button>
           <button onClick={onDelete}
@@ -340,7 +354,7 @@ const TaskDetailSheet = memo(function TaskDetailSheet({ detailId, editForm, setE
             <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"11px 14px",borderBottom:i<subtasks.length-1?`1px solid ${BORD}`:"none"}}>
               <button onClick={()=>toggleSub(s.id)}
                 style={{width:22,height:22,borderRadius:11,border:s.done?"none":`2px solid ${ACC}50`,
-                  background:s.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",
+                  background:s.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {s.done && <span style={{color:"#fff",fontSize:11}}>✓</span>}
               </button>
@@ -652,7 +666,7 @@ function LoginScreen() {
         <>
           <div style={{...gl(),borderRadius:14,padding:"10px 16px",marginBottom:20,
             display:"flex",alignItems:"center",gap:10,width:"100%"}}>
-            <span style={{fontSize:12,color:isNew?"#34C759":ACC,fontWeight:700}}>
+            <span style={{fontSize:12,color:isNew?GREEN:ACC,fontWeight:700}}>
               {isNew?"New account":"Welcome back"}
             </span>
             <span style={{fontSize:12,color:T2,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{email}</span>
@@ -742,7 +756,7 @@ function ChangePasswordSheet({ onClose }) {
       {ok ? (
         <div style={{textAlign:"center",padding:"20px 0"}}>
           <div style={{fontSize:32,marginBottom:10}}>✓</div>
-          <div style={{fontSize:16,fontWeight:700,color:"#34C759"}}>Password updated!</div>
+          <div style={{fontSize:16,fontWeight:700,color:GREEN}}>Password updated!</div>
         </div>
       ) : (
         <>
@@ -833,7 +847,7 @@ function ProfileSheet({ onClose, onChangePw, onSignOut }) {
         fontSize:13,color:"rgba(255,255,255,0.9)",lineHeight:1.5}}>{err}</div>}
       {saved&&<div style={{...gl(),borderRadius:12,padding:"12px 14px",marginBottom:14,
         border:"1px solid #34C75940",background:"#34C75912",
-        fontSize:13,color:"#34C759",fontWeight:600}}>Profile updated</div>}
+        fontSize:13,color:GREEN,fontWeight:600}}>Profile updated</div>}
 
       <Lbl>First name</Lbl>
       <input value={firstName} onChange={e=>setFirstName(e.target.value)}
@@ -1170,18 +1184,18 @@ export default function App() {
             {todayTasks.length>0 ? todayTasks.map((t,i)=>{
               const a=getArea(areas,t.area);
               const aIdx=areas.findIndex(ar=>ar.id===t.area);
-              const aColor=CARD_COLORS[aIdx%CARD_COLORS.length];
+              const aTheme=AREA_THEMES[aIdx%AREA_THEMES.length];
               return (
                 <div key={t.id}>
                   <div style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px"}}>
                     <button onClick={()=>toggle(t.id)}
-                      style={{width:22,height:22,borderRadius:11,border:t.done?"none":`2px solid ${ACC}60`,background:t.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      style={{width:22,height:22,borderRadius:11,border:t.done?"none":`2px solid ${ACC}60`,background:t.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                       {t.done&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
                     </button>
                     <div style={{flex:1,minWidth:0}} onClick={()=>openDetail(t.id)}>
                       <div style={{fontSize:14,fontWeight:600,color:t.done?"rgba(255,255,255,0.3)":T1,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
                       <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
-                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:aColor+"30",color:aColor}}>{a.label}</span>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:aTheme.accent+"20",color:aTheme.accent}}>{a.label}</span>
                         {t.time&&<span style={{fontSize:10,color:T2}}>{fmt(t.time)}</span>}
                         {t.priority==="high"&&!t.time&&<span style={{fontSize:10,fontWeight:700,color:PINK}}>Urgent</span>}
                       </div>
@@ -1210,19 +1224,19 @@ export default function App() {
           {expandedArea && (()=>{
             const ea=getArea(areas,expandedArea);
             const eaIdx=areas.findIndex(a=>a.id===expandedArea);
-            const eaColor=CARD_COLORS[eaIdx%CARD_COLORS.length];
+            const eaT=AREA_THEMES[eaIdx%AREA_THEMES.length];
             const eaOpen=tasks.filter(t=>t.area===expandedArea&&!t.done);
             return (
               <div style={{marginBottom:12}}>
-                {/* Colored header — tap to collapse */}
-                <div style={{background:eaColor,borderRadius:"20px 20px 0 0",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}
+                {/* Themed header — tap to collapse */}
+                <div style={{background:eaT.bg,border:`0.5px solid ${eaT.border}`,borderBottom:"none",borderRadius:"18px 18px 0 0",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}
                   onClick={()=>{ setExpandedArea(null); setExpandedTask(null); }}>
-                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{ea.icon}</div>
+                  <div style={{width:40,height:40,borderRadius:12,background:eaT.accent+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:eaT.accent}}>{ea.icon}</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{ea.label}</div>
-                    <div style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{eaOpen.length} open</div>
+                    <div style={{fontSize:16,fontWeight:700,color:T1}}>{ea.label}</div>
+                    <div style={{fontSize:12,color:T2}}>{eaOpen.length} open</div>
                   </div>
-                  <span style={{color:"rgba(255,255,255,0.7)",fontSize:18,display:"inline-block",transform:"rotate(90deg)"}}>›</span>
+                  <span style={{color:eaT.accent,fontSize:18,display:"inline-block",transform:"rotate(90deg)"}}>›</span>
                 </div>
                 {/* Task list */}
                 <div style={{...gl(),borderRadius:"0 0 20px 20px",overflow:"hidden",borderTop:"none"}}>
@@ -1235,7 +1249,7 @@ export default function App() {
                         <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}}
                           onClick={()=>setExpandedTask(et=>et===t.id?null:t.id)}>
                           <button onClick={e=>{ e.stopPropagation(); toggle(t.id); }}
-                            style={{width:24,height:24,borderRadius:12,border:`2px solid ${eaColor}70`,background:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            style={{width:24,height:24,borderRadius:12,border:`2px solid ${eaT.accent}70`,background:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           </button>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:15,fontWeight:600,color:T1,lineHeight:1.3}}>{t.text}</div>
@@ -1246,7 +1260,7 @@ export default function App() {
                           </div>
                           <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                             {subs.length>0&&(
-                              <span style={{fontSize:13,color:eaColor,display:"inline-block",transition:"transform 0.2s",transform:isExpT?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                              <span style={{fontSize:13,color:eaT.accent,display:"inline-block",transition:"transform 0.2s",transform:isExpT?"rotate(90deg)":"rotate(0deg)"}}>›</span>
                             )}
                             <span onClick={e=>{ e.stopPropagation(); openDetail(t.id); }}
                               style={{fontSize:13,color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:"2px 4px"}}>⋯</span>
@@ -1254,11 +1268,11 @@ export default function App() {
                         </div>
                         {/* Subtasks */}
                         {isExpT&&subs.length>0&&(
-                          <div style={{marginLeft:52,marginRight:16,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${eaColor}25`,background:`${eaColor}0D`}}>
+                          <div style={{marginLeft:52,marginRight:16,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${eaT.accent}25`,background:`${eaT.accent}0D`}}>
                             {subs.map((s,si)=>(
                               <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderBottom:si<subs.length-1?`1px solid ${BORD}`:"none"}}>
                                 <button onClick={()=>toggleSub(t.id,s.id)}
-                                  style={{width:18,height:18,borderRadius:9,border:s.done?"none":`1.5px solid ${eaColor}60`,background:s.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  style={{width:18,height:18,borderRadius:9,border:s.done?"none":`1.5px solid ${eaT.accent}60`,background:s.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
                                   {s.done&&<span style={{color:"#fff",fontSize:9}}>✓</span>}
                                 </button>
                                 <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.85)",textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
@@ -1286,25 +1300,25 @@ export default function App() {
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
             {areas.filter(a=>a.id!==expandedArea).map(a=>{
               const i=areas.findIndex(ar=>ar.id===a.id);
-              const color=CARD_COLORS[i%CARD_COLORS.length];
+              const th=AREA_THEMES[i%AREA_THEMES.length];
               const at=tasks.filter(t=>t.area===a.id);
               const openC=at.filter(t=>!t.done).length;
               const doneC=at.filter(t=>t.done).length;
               const pct=at.length?Math.round(doneC/at.length*100):0;
               return (
                 <div key={a.id}
-                  style={{background:color,borderRadius:22,padding:"20px 18px",cursor:"pointer",position:"relative",minHeight:170,display:"flex",flexDirection:"column",justifyContent:"space-between"}}
+                  style={{background:th.bg,border:`0.5px solid ${th.border}`,borderRadius:18,padding:"18px 16px",cursor:"pointer",position:"relative",minHeight:160,display:"flex",flexDirection:"column",justifyContent:"space-between"}}
                   onClick={()=>{ setExpandedArea(a.id); setExpandedTask(null); }}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{a.icon}</div>
+                    <div style={{width:44,height:44,borderRadius:12,background:th.accent+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:th.accent}}>{a.icon}</div>
                     <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
-                      style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:12,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
+                      style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:8,width:26,height:26,cursor:"pointer",fontSize:11,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
                   </div>
                   <div>
-                    <div style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.75)",marginBottom:2}}>{a.label}</div>
-                    <div style={{fontSize:34,fontWeight:800,color:"#fff",lineHeight:1,marginBottom:10}}>{openC}</div>
-                    <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.2)"}}>
-                      <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.9)",width:`${pct}%`,transition:"width 0.4s"}}/>
+                    <div style={{fontSize:12,fontWeight:600,color:T2,marginBottom:4}}>{a.label}</div>
+                    <div style={{fontSize:32,fontWeight:800,color:th.accent,lineHeight:1,marginBottom:10}}>{openC}</div>
+                    <div style={{height:2,borderRadius:2,background:BORD}}>
+                      <div style={{height:2,borderRadius:2,background:th.accent,width:`${pct}%`,transition:"width 0.4s"}}/>
                     </div>
                   </div>
                 </div>
@@ -1583,7 +1597,7 @@ export default function App() {
                     })}
                     <div style={{padding:"10px 16px",borderTop:`1px solid ${BORD}`}}>
                       {m.tasksAdded?(
-                        <div style={{fontSize:13,fontWeight:700,color:"#34C759"}}>✓ Added to your tasks</div>
+                        <div style={{fontSize:13,fontWeight:700,color:GREEN}}>✓ Added to your tasks</div>
                       ):(
                         <button onClick={()=>addMsgTasks(m)}
                           style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:ACC,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>
