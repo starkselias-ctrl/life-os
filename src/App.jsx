@@ -994,7 +994,9 @@ export default function App() {
   const [expandedTask, setExpandedTask] = useState(null);
   const [detailId,    setDetailId]    = useState(null);
   const [editForm,    setEditForm]    = useState(null);
-  const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
+  const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:"",subtasks:[]});
+  const [newSubText,  setNewSubText]  = useState("");   // add-subtask input in task detail
+  const [newTSubText, setNewTSubText] = useState("");   // add-subtask input in new-task form
   const [newDay,      setNewDay]      = useState("today");
   const [showAreaMgr, setShowAreaMgr] = useState(false);
   const [editingArea, setEditingArea] = useState(null);
@@ -1147,7 +1149,7 @@ export default function App() {
   const addManual   = useCallback(()=>{
     const n=newTRef.current;
     if(!n.text.trim()) return;
-    setTasks(ts=>[...ts,{...n,id:uid(),done:false,subtasks:[]}]);
+    setTasks(ts=>[...ts,{...n,id:uid(),done:false,subtasks:n.subtasks||[]}]);
     const aa=activeAreaRef.current;
     setNewT({text:"",area:aa||"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
     setView(aa?"area":"home");
@@ -1300,7 +1302,7 @@ export default function App() {
                 style={{padding:"6px 14px",borderRadius:20,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:T2}}>
                 Account
               </button>
-              <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }}
+              <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:"",subtasks:[]}); setView("new-task"); }}
                 style={{width:46,height:46,borderRadius:23,background:ACC,border:"none",cursor:"pointer",fontSize:24,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
             </div>
           </div>
@@ -1560,22 +1562,46 @@ export default function App() {
           </div>
 
           {/* Subtasks */}
-          {tdSubs.length>0&&(
-            <div style={{marginBottom:20}}>
-              <Lbl>Subtasks ({tdSubDone}/{tdSubs.length})</Lbl>
-              {tdSubs.map(s=>(
-                <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
-                  background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
-                  <button onClick={()=>toggleSubLocal(s.id)}
-                    style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex"}}>
-                    {Icon.checkSquare(s.done)}
-                  </button>
-                  <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
-                    textDecoration:s.done?"line-through":"none",flex:1}}>{s.text}</span>
-                </div>
-              ))}
+          <div style={{marginBottom:20}}>
+            <Lbl>Subtasks{tdSubs.length>0?` (${tdSubDone}/${tdSubs.length})`:""}</Lbl>
+            {tdSubs.map(s=>(
+              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
+                background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
+                <button onClick={()=>toggleSubLocal(s.id)}
+                  style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex"}}>
+                  {Icon.checkSquare(s.done)}
+                </button>
+                <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":T2,
+                  textDecoration:s.done?"line-through":"none",flex:1}}>{s.text}</span>
+                <button onClick={()=>setEditForm(f=>({...f,subtasks:f.subtasks.filter(sub=>sub.id!==s.id)}))}
+                  style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
+              </div>
+            ))}
+            {/* Add subtask input */}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <input value={newSubText} onChange={e=>setNewSubText(e.target.value)}
+                onKeyDown={e=>{
+                  if(e.key==="Enter"&&newSubText.trim()){
+                    setEditForm(f=>({...f,subtasks:[...f.subtasks,{id:uid(),text:newSubText.trim(),done:false}]}));
+                    setNewSubText("");
+                  }
+                }}
+                placeholder="Add a subtask…"
+                style={{...IS,flex:1,padding:"9px 12px",fontSize:13}}/>
+              <button
+                onClick={()=>{
+                  if(!newSubText.trim()) return;
+                  setEditForm(f=>({...f,subtasks:[...f.subtasks,{id:uid(),text:newSubText.trim(),done:false}]}));
+                  setNewSubText("");
+                }}
+                disabled={!newSubText.trim()}
+                style={{padding:"9px 14px",borderRadius:12,border:"none",
+                  background:newSubText.trim()?ACC:"rgba(255,255,255,0.06)",
+                  color:newSubText.trim()?"#fff":T2,fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+                Add
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Description */}
           <Lbl>Description</Lbl>
@@ -1766,7 +1792,7 @@ export default function App() {
                 ))}
               </div>
             )}
-            <button onClick={()=>{ setNewT({text:"",area:activeArea,priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }}
+            <button onClick={()=>{ setNewT({text:"",area:activeArea,priority:"med",due:"",time:"",dur:30,desc:"",notes:"",subtasks:[]}); setView("new-task"); }}
               style={{width:"100%",padding:"15px",borderRadius:16,border:"none",background:ACC,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>
               + Add to {a.label}
             </button>
@@ -2061,7 +2087,40 @@ export default function App() {
           <div><Lbl>Duration (min)</Lbl><input type="number" placeholder="30" value={newT.dur||""} onChange={e=>setNewT(n=>({...n,dur:+e.target.value}))} style={IS}/></div>
         </div>
         <Lbl>Due date</Lbl>
-        <input type="date" value={newT.due} onChange={e=>setNewT(n=>({...n,due:e.target.value}))} style={{...IS,marginBottom:28}}/>
+        <input type="date" value={newT.due} onChange={e=>setNewT(n=>({...n,due:e.target.value}))} style={{...IS,marginBottom:20}}/>
+        <Lbl>Subtasks{(newT.subtasks||[]).length>0?` (${(newT.subtasks||[]).length})`:""}</Lbl>
+        {(newT.subtasks||[]).map(s=>(
+          <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,
+            background:SURF,borderRadius:8,padding:"8px 10px",marginBottom:5}}>
+            <span style={{display:"flex",color:T2}}>{Icon.checkSquare(false)}</span>
+            <span style={{fontSize:13,color:T2,flex:1}}>{s.text}</span>
+            <button onClick={()=>setNewT(n=>({...n,subtasks:n.subtasks.filter(sub=>sub.id!==s.id)}))}
+              style={{background:"none",border:"none",color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer",padding:"0 2px"}}>×</button>
+          </div>
+        ))}
+        <div style={{display:"flex",gap:8,marginBottom:28}}>
+          <input value={newTSubText} onChange={e=>setNewTSubText(e.target.value)}
+            onKeyDown={e=>{
+              if(e.key==="Enter"&&newTSubText.trim()){
+                setNewT(n=>({...n,subtasks:[...(n.subtasks||[]),{id:uid(),text:newTSubText.trim(),done:false}]}));
+                setNewTSubText("");
+              }
+            }}
+            placeholder="Add a subtask…"
+            style={{...IS,flex:1,padding:"9px 12px",fontSize:13}}/>
+          <button
+            onClick={()=>{
+              if(!newTSubText.trim()) return;
+              setNewT(n=>({...n,subtasks:[...(n.subtasks||[]),{id:uid(),text:newTSubText.trim(),done:false}]}));
+              setNewTSubText("");
+            }}
+            disabled={!newTSubText.trim()}
+            style={{padding:"9px 14px",borderRadius:12,border:"none",
+              background:newTSubText.trim()?ACC:"rgba(255,255,255,0.06)",
+              color:newTSubText.trim()?"#fff":T2,fontSize:13,fontWeight:600,cursor:"pointer",flexShrink:0}}>
+            Add
+          </button>
+        </div>
         <button onClick={addManual}
           style={{width:"100%",padding:"16px",borderRadius:16,border:"none",background:ACC,color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer"}}>
           Create
