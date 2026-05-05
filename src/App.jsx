@@ -470,47 +470,80 @@ const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, ar
 // ─────────────────────────────────────────
 // LOGIN SCREEN
 // ─────────────────────────────────────────
+const CLERK_ERRORS = {
+  form_identifier_not_found:   "No account found with that email.",
+  form_password_incorrect:     "Wrong password. Try again or use Email code.",
+  form_param_format_invalid:   "Please enter a valid email address.",
+  form_identifier_exists:      "An account with this email already exists.",
+  too_many_requests:           "Too many attempts — wait a minute and try again.",
+  form_code_incorrect:         "That code is wrong. Check your email and try again.",
+  verification_code_not_found: "Code expired. Go back and request a new one.",
+  already_verified:            "Email already verified — try signing in instead.",
+  session_exists:              "You're already signed in.",
+};
+
+function clerkMsg(e) {
+  const code = e?.errors?.[0]?.code;
+  return CLERK_ERRORS[code] || e?.errors?.[0]?.message || "Something went wrong.";
+}
+
+function ErrCard({ msg, onDismiss }) {
+  if(!msg) return null;
+  return (
+    <div style={{...gl(),borderRadius:14,padding:"14px 16px",marginBottom:14,
+      border:`1px solid ${PINK}40`,background:`${PINK}12`,width:"100%"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+        <div style={{fontSize:13,color:"rgba(255,255,255,0.9)",lineHeight:1.5,flex:1}}>{msg}</div>
+        <button onClick={onDismiss}
+          style={{background:"none",border:"none",color:T2,fontSize:16,cursor:"pointer",flexShrink:0,padding:0,lineHeight:1}}>×</button>
+      </div>
+    </div>
+  );
+}
+
 function LoginScreen() {
   const { signIn, isLoaded:siLoaded, setActive:setSiActive } = useSignIn();
   const { signUp, isLoaded:suLoaded, setActive:setSuActive } = useSignUp();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
   const [code,     setCode]     = useState("");
-  const [method,   setMethod]   = useState("password"); // "password" | "code"
-  const [step,     setStep]     = useState("form");     // "form" | "verify"
+  const [method,   setMethod]   = useState("password");
+  const [step,     setStep]     = useState("form"); // "form" | "verify" | "reset" | "reset-verify"
   const [isNew,    setIsNew]    = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [err,      setErr]      = useState("");
+  const [info,     setInfo]     = useState("");
 
   const ready = siLoaded && suLoaded;
+  const clearErr = () => setErr("");
 
-  // ── Password flow ──
+  // ── Password sign-in / sign-up ──
   async function handlePassword() {
     if(!ready||!email.trim()||!password.trim()) return;
-    setLoading(true); setErr("");
+    setLoading(true); setErr(""); setInfo("");
     try {
       const r = await signIn.create({ identifier:email, password });
       if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
     } catch(e) {
       const ec=e.errors?.[0]?.code;
       if(ec==="form_identifier_not_found") {
-        // New user — create account
         try {
           await signUp.create({ emailAddress:email, password });
           await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
           setIsNew(true); setStep("verify");
-        } catch(e2) { setErr(e2.errors?.[0]?.message||"Sign up failed"); }
+        } catch(e2) { setErr(clerkMsg(e2)); }
       } else {
-        setErr(e.errors?.[0]?.message||"Invalid email or password");
+        setErr(clerkMsg(e));
       }
     }
     setLoading(false);
   }
 
-  // ── Email code flow ──
+  // ── Email code sign-in / sign-up ──
   async function handleSendCode() {
     if(!ready||!email.trim()) return;
-    setLoading(true); setErr("");
+    setLoading(true); setErr(""); setInfo("");
     try {
       await signIn.create({ strategy:"email_code", identifier:email });
       setIsNew(false); setStep("verify");
@@ -521,15 +554,13 @@ function LoginScreen() {
           await signUp.create({ emailAddress:email });
           await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
           setIsNew(true); setStep("verify");
-        } catch(e2) { setErr(e2.errors?.[0]?.message||"Sign up failed"); }
-      } else {
-        setErr(e.errors?.[0]?.message||"Could not send code");
-      }
+        } catch(e2) { setErr(clerkMsg(e2)); }
+      } else { setErr(clerkMsg(e)); }
     }
     setLoading(false);
   }
 
-  // ── Verify 6-digit code ──
+  // ── Verify code (sign-in or sign-up) ──
   async function handleVerify() {
     if(!ready||code.length!==6) return;
     setLoading(true); setErr("");
@@ -541,7 +572,32 @@ function LoginScreen() {
         const r = await signIn.attemptFirstFactor({ strategy:"email_code", code });
         if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
       }
-    } catch(e) { setErr(e.errors?.[0]?.message||"Invalid code"); }
+    } catch(e) { setErr(clerkMsg(e)); }
+    setLoading(false);
+  }
+
+  // ── Forgot password: send reset code ──
+  async function handleForgot() {
+    if(!ready||!email.trim()) { setErr("Enter your email first."); return; }
+    setLoading(true); setErr(""); setInfo("");
+    try {
+      await signIn.create({ strategy:"reset_password_email_code", identifier:email });
+      setStep("reset-verify"); setInfo("Reset code sent — check your email.");
+    } catch(e) { setErr(clerkMsg(e)); }
+    setLoading(false);
+  }
+
+  // ── Reset password: verify code + set new password ──
+  const [newPw, setNewPw] = useState("");
+  async function handleReset() {
+    if(!ready||code.length!==6||!newPw.trim()) return;
+    setLoading(true); setErr("");
+    try {
+      const r = await signIn.attemptFirstFactor({
+        strategy:"reset_password_email_code", code, password:newPw
+      });
+      if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
+    } catch(e) { setErr(clerkMsg(e)); }
     setLoading(false);
   }
 
@@ -561,12 +617,19 @@ function LoginScreen() {
         Sign in or create an account
       </div>
 
-      {step==="form" ? (
+      {info&&<div style={{...gl(),borderRadius:14,padding:"12px 16px",marginBottom:14,
+        border:`1px solid ${ACC}40`,background:`${ACC}12`,width:"100%",
+        fontSize:13,color:"rgba(255,255,255,0.9)"}}>
+        {info}
+      </div>}
+
+      <ErrCard msg={err} onDismiss={clearErr}/>
+
+      {step==="form" && (
         <>
-          {/* Method toggle */}
           <div style={{...gl(),borderRadius:14,padding:4,display:"flex",marginBottom:20,width:"100%"}}>
             {[{id:"password",label:"Password"},{id:"code",label:"Email code"}].map(m=>(
-              <button key={m.id} onClick={()=>{setMethod(m.id);setErr("");}}
+              <button key={m.id} onClick={()=>{setMethod(m.id);clearErr();}}
                 style={{flex:1,padding:"9px 0",borderRadius:11,border:"none",cursor:"pointer",
                   background:method===m.id?ACC:"transparent",
                   color:method===m.id?"#fff":T2,fontSize:14,fontWeight:700}}>
@@ -581,42 +644,89 @@ function LoginScreen() {
             style={{...IS,marginBottom:12,fontSize:16}}/>
 
           {method==="password" && (
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&handlePassword()}
-              placeholder="Password"
-              style={{...IS,marginBottom:12,fontSize:16}}/>
+            <div style={{position:"relative",width:"100%",marginBottom:8}}>
+              <input type={showPw?"text":"password"} value={password}
+                onChange={e=>setPassword(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&handlePassword()}
+                placeholder="Password"
+                style={{...IS,paddingRight:48}}/>
+              <button onClick={()=>setShowPw(s=>!s)}
+                style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                  background:"none",border:"none",color:T2,cursor:"pointer",fontSize:13,fontWeight:600}}>
+                {showPw?"Hide":"Show"}
+              </button>
+            </div>
           )}
 
-          {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
+          {method==="password" && (
+            <button onClick={handleForgot} disabled={loading}
+              style={{background:"none",border:"none",color:T2,fontSize:12,cursor:"pointer",
+                marginBottom:16,alignSelf:"flex-start",padding:0,textDecoration:"underline"}}>
+              Forgot password?
+            </button>
+          )}
 
           <button
             onClick={method==="password"?handlePassword:handleSendCode}
             disabled={!email.trim()||loading||!ready||(method==="password"&&!password.trim())}
             style={btnStyle(email.trim()&&(method==="code"||password.trim()))}>
-            {loading?"Please wait…":method==="password"?"Continue →":"Send code →"}
+            {loading?"Please wait…":method==="password"?"Sign in →":"Send code →"}
           </button>
         </>
-      ) : (
+      )}
+
+      {step==="verify" && (
         <>
-          <div style={{...gl(),borderRadius:14,padding:"10px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{...gl(),borderRadius:14,padding:"10px 16px",marginBottom:20,
+            display:"flex",alignItems:"center",gap:10,width:"100%"}}>
             <span style={{fontSize:12,color:isNew?"#34C759":ACC,fontWeight:700}}>
               {isNew?"New account":"Welcome back"}
             </span>
-            <span style={{fontSize:12,color:T2}}>{email}</span>
+            <span style={{fontSize:12,color:T2,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{email}</span>
           </div>
           <div style={{fontSize:14,color:T2,marginBottom:16,textAlign:"center",lineHeight:1.6}}>
             Enter the 6-digit code sent to your email
           </div>
           <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
             onKeyDown={e=>e.key==="Enter"&&handleVerify()} placeholder="000000" maxLength={6} autoFocus
-            style={{...IS,marginBottom:12,textAlign:"center",fontSize:28,letterSpacing:10,fontWeight:700}}/>
-          {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
+            style={{...IS,marginBottom:16,textAlign:"center",fontSize:28,letterSpacing:10,fontWeight:700}}/>
           <button onClick={handleVerify} disabled={code.length!==6||loading} style={btnStyle(code.length===6)}>
             {loading?"Verifying…":isNew?"Create account →":"Sign in →"}
           </button>
-          <button onClick={()=>{setStep("form");setCode("");setErr("");}}
+          <button onClick={()=>{setStep("form");setCode("");clearErr();}}
             style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer",marginTop:12}}>
             ← Back
+          </button>
+        </>
+      )}
+
+      {step==="reset-verify" && (
+        <>
+          <div style={{fontSize:14,color:T2,marginBottom:16,textAlign:"center",lineHeight:1.6}}>
+            Enter the reset code from your email,<br/>then choose a new password.
+          </div>
+          <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
+            placeholder="6-digit code" maxLength={6} autoFocus
+            style={{...IS,marginBottom:12,textAlign:"center",fontSize:22,letterSpacing:8,fontWeight:700}}/>
+          <div style={{position:"relative",width:"100%",marginBottom:16}}>
+            <input type={showPw?"text":"password"} value={newPw}
+              onChange={e=>setNewPw(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handleReset()}
+              placeholder="New password"
+              style={{...IS,paddingRight:48}}/>
+            <button onClick={()=>setShowPw(s=>!s)}
+              style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+                background:"none",border:"none",color:T2,cursor:"pointer",fontSize:13,fontWeight:600}}>
+              {showPw?"Hide":"Show"}
+            </button>
+          </div>
+          <button onClick={handleReset} disabled={code.length!==6||!newPw.trim()||loading}
+            style={btnStyle(code.length===6&&newPw.trim())}>
+            {loading?"Resetting…":"Set new password →"}
+          </button>
+          <button onClick={()=>{setStep("form");setCode("");setNewPw("");clearErr();}}
+            style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer",marginTop:12}}>
+            ← Back to sign in
           </button>
         </>
       )}
