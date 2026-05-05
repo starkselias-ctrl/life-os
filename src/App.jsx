@@ -133,18 +133,25 @@ const gl = (bl=20) => ({
   border:`1px solid ${BORD}`,
 });
 
+const MAX_W = 480;
+
 const PAGE = {
   fontFamily:"system-ui,sans-serif",
   width:"100%",
+  maxWidth:MAX_W,
+  margin:"0 auto",
   minHeight:"100vh",
   background:"#0D0D0F",
   overflowX:"hidden",
   overflowY:"auto",
   WebkitOverflowScrolling:"touch",
+  position:"relative",
 };
 
 const TABBAR = {
-  position:"fixed",bottom:0,left:0,right:0,
+  position:"fixed",bottom:0,
+  left:"50%",transform:"translateX(-50%)",
+  width:"100%",maxWidth:MAX_W,
   background:"#111116",
   backdropFilter:"blur(30px)",
   WebkitBackdropFilter:"blur(30px)",

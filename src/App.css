@@ -20,6 +20,25 @@ html, body {
   overscroll-behavior: none;
 }
 
+/* Desktop: center the app frame */
+@media (min-width: 520px) {
+  html, body {
+    background: #070709;
+  }
+  #root {
+    display: flex;
+    justify-content: center;
+    background: #070709;
+  }
+  #root > div {
+    max-width: 480px;
+    width: 100%;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    border-right: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 0 80px rgba(0,0,0,0.6);
+  }
+}
+
 /* Remove tap highlight on mobile */
 * {
   -webkit-tap-highlight-color: transparent;
