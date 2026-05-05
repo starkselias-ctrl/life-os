@@ -1059,18 +1059,22 @@ export default function App() {
       localStorage.removeItem("los_tasks");
     }
     localStorage.setItem("los_userid",userId);
-    Promise.all([authFetch("/api/areas"),authFetch("/api/tasks")]).then(async([ar,tr])=>{
-      const aData=await ar.json(); const tData=await tr.json();
-      // Different user: reset to clean defaults then apply whatever Neon has
-      if(switched){
-        setAreas(aData?.length ? aData : DEFAULT_AREAS);
-        setTasks(tData?.length ? tData.map(t=>({subtasks:[],...t})) : []);
-      } else {
-        if(aData?.length) setAreas(aData);
-        if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
-      }
-      setSyncEnabled(true);
-    });
+    Promise.all([authFetch("/api/areas"),authFetch("/api/tasks")])
+      .then(async([ar,tr])=>{
+        if(!ar.ok) { console.error("areas load failed:",ar.status,await ar.text()); }
+        if(!tr.ok) { console.error("tasks load failed:",tr.status,await tr.text()); }
+        const aData = ar.ok ? await ar.json().catch(()=>[]) : [];
+        const tData = tr.ok ? await tr.json().catch(()=>[]) : [];
+        if(switched){
+          setAreas(aData?.length ? aData : DEFAULT_AREAS);
+          setTasks(tData?.length ? tData.map(t=>({subtasks:[],...t})) : []);
+        } else {
+          if(aData?.length) setAreas(aData);
+          if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
+        }
+      })
+      .catch(e=>console.error("Data load network error:",e))
+      .finally(()=>setSyncEnabled(true)); // always enable sync even on error
   },[isSignedIn,userId]);
 
   // ── Focus timer interval ──
@@ -1101,19 +1105,21 @@ export default function App() {
   useEffect(()=>{
     if(!isSignedIn||!syncEnabled) return;
     const timer=setTimeout(()=>{
-      authFetch("/api/areas",{method:"POST",body:JSON.stringify({areas})});
+      authFetch("/api/areas",{method:"POST",body:JSON.stringify({areas})})
+        .then(r=>{ if(!r.ok) r.text().then(t=>console.error("areas sync failed:",r.status,t)); })
+        .catch(e=>console.error("areas sync error:",e));
     },800);
     return ()=>clearTimeout(timer);
-   
   },[areas,isSignedIn,syncEnabled]);
 
   useEffect(()=>{
     if(!isSignedIn||!syncEnabled) return;
     const timer=setTimeout(()=>{
-      authFetch("/api/tasks",{method:"POST",body:JSON.stringify({tasks})});
+      authFetch("/api/tasks",{method:"POST",body:JSON.stringify({tasks})})
+        .then(r=>{ if(!r.ok) r.text().then(t=>console.error("tasks sync failed:",r.status,t)); })
+        .catch(e=>console.error("tasks sync error:",e));
     },800);
     return ()=>clearTimeout(timer);
-   
   },[tasks,isSignedIn,syncEnabled]);
 
   const toggle    = useCallback((id)=>{

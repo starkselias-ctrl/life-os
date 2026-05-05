@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const rows = await sql`
-        SELECT id, text, area, done, priority, due, time, dur, desc, notes, subtasks
+        SELECT id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring
         FROM tasks WHERE user_id = ${userId}
       `;
       return res.json(rows);
@@ -24,17 +24,18 @@ export default async function handler(req, res) {
       if (!tasks?.length) return res.json({ ok: true });
       for (const t of tasks) {
         await sql`
-          INSERT INTO tasks (id, user_id, text, area, done, priority, due, time, dur, desc, notes, subtasks)
+          INSERT INTO tasks (id, user_id, text, area, done, priority, due, time, dur, desc, notes, subtasks, recurring)
           VALUES (
             ${t.id}, ${userId}, ${t.text}, ${t.area||"inbox"}, ${t.done||false},
             ${t.priority||"med"}, ${t.due||""}, ${t.time||""}, ${t.dur||30},
-            ${t.desc||""}, ${t.notes||""}, ${JSON.stringify(t.subtasks||[])}
+            ${t.desc||""}, ${t.notes||""}, ${JSON.stringify(t.subtasks||[])},
+            ${t.recurring||null}
           )
           ON CONFLICT (id) DO UPDATE SET
             text = EXCLUDED.text, area = EXCLUDED.area, done = EXCLUDED.done,
             priority = EXCLUDED.priority, due = EXCLUDED.due, time = EXCLUDED.time,
             dur = EXCLUDED.dur, desc = EXCLUDED.desc, notes = EXCLUDED.notes,
-            subtasks = EXCLUDED.subtasks
+            subtasks = EXCLUDED.subtasks, recurring = EXCLUDED.recurring
         `;
       }
       return res.json({ ok: true });
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
     }
   } catch (e) {
     console.error("tasks error:", e);
-    return res.status(500).json({ error: "Database error" });
+    return res.status(500).json({ error: "Database error", detail: e.message });
   }
 
   return res.status(405).json({ error: "Method not allowed" });
