@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import { supabase } from "./lib/supabase.js";
+import { useAuth, useSignIn } from "@clerk/clerk-react";
 
 const ACC  = "#2B6AFF";
 const PINK = "#E84393";
@@ -463,7 +463,34 @@ const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, ar
 // ─────────────────────────────────────────
 // LOGIN SCREEN
 // ─────────────────────────────────────────
-function LoginScreen({ email, setEmail, onSend, sent, loading, err }) {
+function LoginScreen() {
+  const { signIn, isLoaded, setActive } = useSignIn();
+  const [email, setEmail] = useState("");
+  const [code,  setCode]  = useState("");
+  const [step,  setStep]  = useState("email");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function sendCode() {
+    if(!isLoaded||!email.trim()) return;
+    setLoading(true); setErr("");
+    try {
+      await signIn.create({ strategy:"email_code", identifier:email });
+      setStep("code");
+    } catch(e) { setErr(e.errors?.[0]?.message||"Something went wrong"); }
+    setLoading(false);
+  }
+
+  async function verify() {
+    if(!isLoaded||code.length!==6) return;
+    setLoading(true); setErr("");
+    try {
+      const result = await signIn.attemptFirstFactor({ strategy:"email_code", code });
+      if(result.status==="complete") await setActive({ session:result.createdSessionId });
+    } catch(e) { setErr(e.errors?.[0]?.message||"Invalid code"); }
+    setLoading(false);
+  }
+
   return (
     <div style={{...PAGE,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 32px"}}>
       <div style={{fontSize:44,marginBottom:16}}>✦</div>
@@ -471,30 +498,39 @@ function LoginScreen({ email, setEmail, onSend, sent, loading, err }) {
       <div style={{fontSize:14,color:T2,marginBottom:40,textAlign:"center",lineHeight:1.5}}>
         Sign in to sync your tasks<br/>across all your devices
       </div>
-      {!sent ? (
+      {step==="email" ? (
         <>
           <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&onSend()}
-            placeholder="your@email.com" autoFocus
+            onKeyDown={e=>e.key==="Enter"&&sendCode()} placeholder="your@email.com" autoFocus
             style={{...IS,marginBottom:12,textAlign:"center",fontSize:17}}/>
           {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
-          <button onClick={onSend} disabled={!email.trim()||loading}
+          <button onClick={sendCode} disabled={!email.trim()||loading||!isLoaded}
             style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
               background:email.trim()&&!loading?ACC:"rgba(255,255,255,0.08)",
-              color:email.trim()&&!loading?"#fff":T2,
-              fontSize:16,fontWeight:700,cursor:"pointer"}}>
-            {loading?"Sending…":"Send magic link →"}
+              color:email.trim()&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer"}}>
+            {loading?"Sending…":"Send code →"}
           </button>
         </>
       ) : (
-        <div style={{...gl(),borderRadius:20,padding:"28px 24px",textAlign:"center",width:"100%",maxWidth:340}}>
-          <div style={{fontSize:36,marginBottom:12}}>✉</div>
-          <div style={{fontSize:17,fontWeight:700,color:T1,marginBottom:8}}>Check your email</div>
-          <div style={{fontSize:14,color:T2,lineHeight:1.6}}>
-            We sent a link to<br/><strong style={{color:T1}}>{email}</strong><br/>
-            Click it to sign in.
+        <>
+          <div style={{fontSize:14,color:T2,marginBottom:16,textAlign:"center",lineHeight:1.6}}>
+            Enter the 6-digit code sent to<br/><strong style={{color:T1}}>{email}</strong>
           </div>
-        </div>
+          <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
+            onKeyDown={e=>e.key==="Enter"&&verify()} placeholder="000000" maxLength={6} autoFocus
+            style={{...IS,marginBottom:12,textAlign:"center",fontSize:28,letterSpacing:10,fontWeight:700}}/>
+          {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
+          <button onClick={verify} disabled={code.length!==6||loading}
+            style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
+              background:code.length===6&&!loading?ACC:"rgba(255,255,255,0.08)",
+              color:code.length===6&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer",marginBottom:12}}>
+            {loading?"Verifying…":"Sign in →"}
+          </button>
+          <button onClick={()=>{setStep("email");setCode("");setErr("");}}
+            style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer"}}>
+            ← Use different email
+          </button>
+        </>
       )}
     </div>
   );
@@ -526,13 +562,8 @@ export default function App() {
   const [aiErr,     setAiErr]     = useState("");
   const [messages,  setMessages]  = useState([]); // conversation thread
 
-  // ── Auth ──
-  const [user,        setUser]        = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authEmail,   setAuthEmail]   = useState("");
-  const [authSent,    setAuthSent]    = useState(false);
-  const [authLoad,    setAuthLoad]    = useState(false);
-  const [authErr,     setAuthErr]     = useState("");
+  // ── Clerk auth ──
+  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
   const [syncEnabled, setSyncEnabled] = useState(false);
 
   const tasksRef      = useRef(tasks);
@@ -540,70 +571,58 @@ export default function App() {
   const activeAreaRef = useRef(activeArea);
   const newTRef       = useRef(newT);
   const messagesRef   = useRef(messages);
-  const userRef       = useRef(user);
+  const getTokenRef   = useRef(getToken);
   useEffect(()=>{ tasksRef.current      = tasks;    },[tasks]);
   useEffect(()=>{ editFormRef.current   = editForm; },[editForm]);
   useEffect(()=>{ activeAreaRef.current = activeArea; },[activeArea]);
   useEffect(()=>{ newTRef.current       = newT;     },[newT]);
   useEffect(()=>{ messagesRef.current   = messages; },[messages]);
-  useEffect(()=>{ userRef.current       = user;     },[user]);
+  useEffect(()=>{ getTokenRef.current   = getToken; },[getToken]);
 
-  // ── Persist to localStorage ──
+  // ── Persist to localStorage (offline cache) ──
   useEffect(()=>save("los_areas",areas),[areas]);
   useEffect(()=>save("los_tasks",tasks),[tasks]);
 
-  // ── Auth: restore session + listen for changes ──
-  async function loadData(userId){
-    const [{data:aData},{data:tData}]=await Promise.all([
-      supabase.from("areas").select("id,label,sub,icon").eq("user_id",userId).order("sort_order"),
-      supabase.from("tasks").select("id,text,area,done,priority,due,time,dur,desc,notes,subtasks").eq("user_id",userId),
-    ]);
-    if(aData?.length) setAreas(aData);
-    if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
-    setSyncEnabled(true);
+  // ── Load data from Neon on sign-in ──
+  async function authFetch(url, opts={}){
+    const token=await getTokenRef.current();
+    return fetch(url,{...opts,headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`,...(opts.headers||{})}});
   }
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}})=>{
-      const u=session?.user??null;
-      setUser(u); setAuthLoading(false);
-      if(u) loadData(u.id);
+    if(!isSignedIn) return;
+    Promise.all([authFetch("/api/areas"),authFetch("/api/tasks")]).then(async([ar,tr])=>{
+      const aData=await ar.json(); const tData=await tr.json();
+      if(aData?.length) setAreas(aData);
+      if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
+      setSyncEnabled(true);
     });
-    const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,session)=>{
-      const u=session?.user??null;
-      setUser(u);
-      if(u) loadData(u.id);
-    });
-    return ()=>subscription.unsubscribe();
-  },[]);
+   
+  },[isSignedIn]);
 
-  // ── Debounced Supabase sync (upsert on change) ──
+  // ── Debounced sync to Neon on change ──
   useEffect(()=>{
-    if(!user||!syncEnabled) return;
+    if(!isSignedIn||!syncEnabled) return;
     const timer=setTimeout(()=>{
-      supabase.from("areas").upsert(
-        areas.map((a,i)=>({...a,user_id:user.id,sort_order:i})),
-        {onConflict:"id"}
-      );
+      authFetch("/api/areas",{method:"POST",body:JSON.stringify({areas})});
     },800);
     return ()=>clearTimeout(timer);
-  },[areas,user,syncEnabled]);
+   
+  },[areas,isSignedIn,syncEnabled]);
 
   useEffect(()=>{
-    if(!user||!syncEnabled) return;
+    if(!isSignedIn||!syncEnabled) return;
     const timer=setTimeout(()=>{
-      supabase.from("tasks").upsert(
-        tasks.map(t=>({...t,user_id:user.id})),
-        {onConflict:"id"}
-      );
+      authFetch("/api/tasks",{method:"POST",body:JSON.stringify({tasks})});
     },800);
     return ()=>clearTimeout(timer);
-  },[tasks,user,syncEnabled]);
+   
+  },[tasks,isSignedIn,syncEnabled]);
 
   const toggle    = useCallback((id)=>{ setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)); },[]);
   const delTask   = useCallback((id)=>{
     setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null);
-    if(userRef.current) supabase.from("tasks").delete().eq("id",id).eq("user_id",userRef.current.id);
+    getTokenRef.current().then(token=>fetch(`/api/tasks?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}));
   },[]);
   const toggleSub = useCallback((taskId,subId)=>{
     setTasks(ts=>ts.map(t=>t.id===taskId
@@ -666,7 +685,7 @@ export default function App() {
     setAreas(as=>as.filter(a=>a.id!==id));
     setConfirmDel(null);
     setActiveArea(aa=>{ if(aa===id){ setView("home"); return null; } return aa; });
-    if(userRef.current) supabase.from("areas").delete().eq("id",id).eq("user_id",userRef.current.id);
+    getTokenRef.current().then(token=>fetch(`/api/areas?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}));
   },[]);
 
   const runAI = useCallback(async()=>{
@@ -752,26 +771,12 @@ export default function App() {
   );
 
   // ── Auth guards ──
-  if(authLoading) return (
+  if(!isLoaded) return (
     <div style={{...PAGE,display:"flex",alignItems:"center",justifyContent:"center"}}>
       <div className="ai-spinner"/>
     </div>
   );
-
-  if(!user){
-    const sendLink=async()=>{
-      if(!authEmail.trim()) return;
-      setAuthLoad(true); setAuthErr("");
-      const {error}=await supabase.auth.signInWithOtp({
-        email:authEmail,
-        options:{emailRedirectTo:window.location.origin}
-      });
-      if(error) setAuthErr(error.message);
-      else setAuthSent(true);
-      setAuthLoad(false);
-    };
-    return <LoginScreen email={authEmail} setEmail={setAuthEmail} onSend={sendLink} sent={authSent} loading={authLoad} err={authErr}/>;
-  }
+  if(!isSignedIn) return <LoginScreen/>;
 
   // ══════════════════════════════════
   // HOME
@@ -793,7 +798,7 @@ export default function App() {
               <div style={{fontSize:24,fontWeight:800,color:T1,letterSpacing:-0.5}}>{greet()}, Elias.</div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
-              <button onClick={()=>supabase.auth.signOut()}
+              <button onClick={()=>signOut()}
                 style={{fontSize:11,fontWeight:700,color:T2,background:"rgba(255,255,255,0.07)",border:"none",borderRadius:20,padding:"6px 12px",cursor:"pointer"}}>
                 Sign out
               </button>
