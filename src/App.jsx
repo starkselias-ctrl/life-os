@@ -166,7 +166,7 @@ const IS = {
 // ─────────────────────────────────────────
 
 const TabBar = memo(function TabBar({ tab, setTab, setView }) {
-  const items = [{id:"home",icon:"◉",label:"Areas"},{id:"schedule",icon:"◷",label:"Schedule"},{id:"ai",icon:"✦",label:"AI"}];
+  const items = [{id:"home",icon:"◉",label:"Tasks"},{id:"schedule",icon:"◷",label:"Schedule"},{id:"ai",icon:"✦",label:"AI"}];
   return (
     <div style={TABBAR}>
       {items.map(v => (
@@ -469,6 +469,8 @@ export default function App() {
   const [tab,    setTab]    = useState("home");
   const [activeArea,   setActiveArea]  = useState(null);
   const [showDone,     setShowDone]    = useState(false);
+  const [expandedArea, setExpandedArea] = useState(null);
+  const [expandedTask, setExpandedTask] = useState(null);
   const [detailId,    setDetailId]    = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
@@ -643,12 +645,9 @@ export default function App() {
   // ══════════════════════════════════
   if(view==="home"){
     const totalOpen=tasks.filter(t=>!t.done).length;
-    let summary;
-    if(totalOpen===0) summary="You're all caught up — nothing open.";
-    else if(urgent.length>0&&scheduled.length>0) summary=`${urgent.length} urgent task${urgent.length>1?"s":""} and ${scheduled.length} scheduled today.`;
-    else if(urgent.length>0) summary=`${urgent.length} urgent task${urgent.length>1?"s":""} need${urgent.length===1?"s":""} your attention.`;
-    else if(scheduled.length>0) summary=`${scheduled.length} task${scheduled.length>1?"s":""} on the schedule today.`;
-    else summary=`${totalOpen} open task${totalOpen>1?"s":""} across ${areas.length} areas.`;
+    // Today's focus list: scheduled first, then urgent-only, deduplicated
+    const scheduledIds = new Set(scheduled.map(t=>t.id));
+    const todayTasks = [...scheduled, ...urgent.filter(t=>!scheduledIds.has(t.id))];
     return (
     <div style={PAGE}>
       <div style={{position:"relative",zIndex:1,paddingBottom:110}}>
@@ -664,28 +663,134 @@ export default function App() {
               style={{width:46,height:46,borderRadius:23,background:ACC,border:"none",cursor:"pointer",fontSize:24,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
           </div>
 
-          {/* ── Daily summary card ── */}
-          <div style={{...gl(),borderRadius:18,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:14}}>
-            <div style={{width:38,height:38,borderRadius:12,background:`${ACC}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>◎</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:11,fontWeight:700,color:T2,textTransform:"uppercase",letterSpacing:1,marginBottom:3}}>Today</div>
-              <div style={{fontSize:14,color:T1,lineHeight:1.4}}>{summary}</div>
+          {/* ── Today card with task list ── */}
+          <div style={{...gl(),borderRadius:20,marginBottom:20,overflow:"hidden"}}>
+            <div style={{padding:"14px 18px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontSize:13,fontWeight:700,color:T1}}>Today</div>
+              <div style={{display:"flex",gap:10}}>
+                {urgent.length>0&&<span style={{fontSize:12,fontWeight:700,color:PINK}}>{urgent.length} urgent</span>}
+                {scheduled.length>0&&<span style={{fontSize:12,fontWeight:700,color:ACC}}>{scheduled.length} scheduled</span>}
+              </div>
             </div>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-              <div style={{fontSize:20,fontWeight:800,color:PINK,lineHeight:1}}>{urgent.length}</div>
-              <div style={{fontSize:9,color:T2,fontWeight:600,textTransform:"uppercase",letterSpacing:0.5}}>urgent</div>
-            </div>
+            {todayTasks.length>0 ? todayTasks.map((t,i)=>{
+              const a=getArea(areas,t.area);
+              const aIdx=areas.findIndex(ar=>ar.id===t.area);
+              const aColor=CARD_COLORS[aIdx%CARD_COLORS.length];
+              return (
+                <div key={t.id}>
+                  <div style={{display:"flex",alignItems:"center",gap:12,padding:"11px 18px"}}>
+                    <button onClick={()=>toggle(t.id)}
+                      style={{width:22,height:22,borderRadius:11,border:t.done?"none":`2px solid ${ACC}60`,background:t.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {t.done&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
+                    </button>
+                    <div style={{flex:1,minWidth:0}} onClick={()=>openDetail(t.id)}>
+                      <div style={{fontSize:14,fontWeight:600,color:t.done?"rgba(255,255,255,0.3)":T1,textDecoration:t.done?"line-through":"none",lineHeight:1.3}}>{t.text}</div>
+                      <div style={{display:"flex",gap:6,marginTop:3,alignItems:"center"}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:aColor+"30",color:aColor}}>{a.label}</span>
+                        {t.time&&<span style={{fontSize:10,color:T2}}>{fmt(t.time)}</span>}
+                        {t.priority==="high"&&!t.time&&<span style={{fontSize:10,fontWeight:700,color:PINK}}>Urgent</span>}
+                      </div>
+                    </div>
+                    <span onClick={()=>openDetail(t.id)} style={{color:"rgba(255,255,255,0.2)",fontSize:14,cursor:"pointer",flexShrink:0}}>›</span>
+                  </div>
+                  {i<todayTasks.length-1&&<div style={{height:1,background:BORD,marginLeft:52}}/>}
+                </div>
+              );
+            }) : (
+              <div style={{padding:"16px 18px 18px",fontSize:13,color:T2}}>
+                {totalOpen===0?"All caught up — nothing open today.":"No urgent or scheduled tasks. Add one with +"}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Area grid ── */}
+        {/* ── Area grid with accordion ── */}
         <div style={{padding:"0 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <Lbl>My areas</Lbl>
             <button onClick={openNewArea} style={{fontSize:12,fontWeight:700,color:ACC,background:"none",border:"none",cursor:"pointer"}}>+ New</button>
           </div>
+
+          {/* Expanded area — full width above the grid */}
+          {expandedArea && (()=>{
+            const ea=getArea(areas,expandedArea);
+            const eaIdx=areas.findIndex(a=>a.id===expandedArea);
+            const eaColor=CARD_COLORS[eaIdx%CARD_COLORS.length];
+            const eaOpen=tasks.filter(t=>t.area===expandedArea&&!t.done);
+            return (
+              <div style={{marginBottom:12}}>
+                {/* Colored header — tap to collapse */}
+                <div style={{background:eaColor,borderRadius:"20px 20px 0 0",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}
+                  onClick={()=>{ setExpandedArea(null); setExpandedTask(null); }}>
+                  <div style={{width:40,height:40,borderRadius:12,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{ea.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:16,fontWeight:700,color:"#fff"}}>{ea.label}</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,0.7)"}}>{eaOpen.length} open</div>
+                  </div>
+                  <span style={{color:"rgba(255,255,255,0.7)",fontSize:18,display:"inline-block",transform:"rotate(90deg)"}}>›</span>
+                </div>
+                {/* Task list */}
+                <div style={{...gl(),borderRadius:"0 0 20px 20px",overflow:"hidden",borderTop:"none"}}>
+                  {eaOpen.length>0 ? eaOpen.map((t,i)=>{
+                    const subs=t.subtasks||[];
+                    const isExpT=expandedTask===t.id;
+                    return (
+                      <div key={t.id}>
+                        {/* Task row — tap body to toggle subtasks */}
+                        <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}}
+                          onClick={()=>setExpandedTask(et=>et===t.id?null:t.id)}>
+                          <button onClick={e=>{ e.stopPropagation(); toggle(t.id); }}
+                            style={{width:24,height:24,borderRadius:12,border:`2px solid ${eaColor}70`,background:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          </button>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:15,fontWeight:600,color:T1,lineHeight:1.3}}>{t.text}</div>
+                            {subs.length>0&&(
+                              <div style={{fontSize:11,color:T2,marginTop:2}}>{subs.filter(s=>s.done).length}/{subs.length} subtasks</div>
+                            )}
+                            {t.time&&<div style={{fontSize:11,color:T2,marginTop:1}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</div>}
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                            {subs.length>0&&(
+                              <span style={{fontSize:13,color:eaColor,display:"inline-block",transition:"transform 0.2s",transform:isExpT?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                            )}
+                            <span onClick={e=>{ e.stopPropagation(); openDetail(t.id); }}
+                              style={{fontSize:13,color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:"2px 4px"}}>⋯</span>
+                          </div>
+                        </div>
+                        {/* Subtasks */}
+                        {isExpT&&subs.length>0&&(
+                          <div style={{marginLeft:52,marginRight:16,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${eaColor}25`,background:`${eaColor}0D`}}>
+                            {subs.map((s,si)=>(
+                              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderBottom:si<subs.length-1?`1px solid ${BORD}`:"none"}}>
+                                <button onClick={()=>toggleSub(t.id,s.id)}
+                                  style={{width:18,height:18,borderRadius:9,border:s.done?"none":`1.5px solid ${eaColor}60`,background:s.done?"#34C759":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {s.done&&<span style={{color:"#fff",fontSize:9}}>✓</span>}
+                                </button>
+                                <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.85)",textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {i<eaOpen.length-1&&<div style={{height:1,background:BORD,marginLeft:16}}/>}
+                      </div>
+                    );
+                  }) : (
+                    <div style={{padding:"20px 18px",textAlign:"center",color:T2,fontSize:13}}>All done in {ea.label} ✓</div>
+                  )}
+                  <button onClick={()=>{ setActiveArea(expandedArea); setView("area"); setShowDone(false); }}
+                    style={{width:"100%",padding:"12px 16px",background:"none",border:"none",borderTop:`1px solid ${BORD}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:13,fontWeight:700,color:ACC}}>View all & completed</span>
+                    <span style={{color:ACC,fontSize:14}}>›</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 2-column grid — non-expanded areas */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-            {areas.map((a,i)=>{
+            {areas.filter(a=>a.id!==expandedArea).map(a=>{
+              const i=areas.findIndex(ar=>ar.id===a.id);
               const color=CARD_COLORS[i%CARD_COLORS.length];
               const at=tasks.filter(t=>t.area===a.id);
               const openC=at.filter(t=>!t.done).length;
@@ -694,18 +799,15 @@ export default function App() {
               return (
                 <div key={a.id}
                   style={{background:color,borderRadius:22,padding:"20px 18px",cursor:"pointer",position:"relative",minHeight:170,display:"flex",flexDirection:"column",justifyContent:"space-between"}}
-                  onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}>
-                  {/* Top row: icon + edit */}
+                  onClick={()=>{ setExpandedArea(a.id); setExpandedTask(null); }}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                     <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{a.icon}</div>
                     <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
                       style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:8,width:28,height:28,cursor:"pointer",fontSize:12,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
                   </div>
-                  {/* Bottom: name + count */}
                   <div>
                     <div style={{fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.75)",marginBottom:2}}>{a.label}</div>
                     <div style={{fontSize:34,fontWeight:800,color:"#fff",lineHeight:1,marginBottom:10}}>{openC}</div>
-                    {/* Progress */}
                     <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.2)"}}>
                       <div style={{height:3,borderRadius:2,background:"rgba(255,255,255,0.9)",width:`${pct}%`,transition:"width 0.4s"}}/>
                     </div>
@@ -713,7 +815,6 @@ export default function App() {
                 </div>
               );
             })}
-            {/* Add new area */}
             <div onClick={openNewArea}
               style={{borderRadius:22,padding:"20px 18px",cursor:"pointer",border:`2px dashed rgba(255,255,255,0.15)`,minHeight:170,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
               <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:T2}}>+</div>
