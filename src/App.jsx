@@ -466,84 +466,134 @@ const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, ar
 function LoginScreen() {
   const { signIn, isLoaded:siLoaded, setActive:setSiActive } = useSignIn();
   const { signUp, isLoaded:suLoaded, setActive:setSuActive } = useSignUp();
-  const [email,   setEmail]   = useState("");
-  const [code,    setCode]    = useState("");
-  const [step,    setStep]    = useState("email"); // "email" | "code"
-  const [mode,    setMode]    = useState("in");    // "in" | "up"
-  const [loading, setLoading] = useState(false);
-  const [err,     setErr]     = useState("");
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [code,     setCode]     = useState("");
+  const [method,   setMethod]   = useState("password"); // "password" | "code"
+  const [step,     setStep]     = useState("form");     // "form" | "verify"
+  const [isNew,    setIsNew]    = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [err,      setErr]      = useState("");
 
   const ready = siLoaded && suLoaded;
 
-  async function handleEmail() {
-    if(!ready||!email.trim()) return;
+  // ── Password flow ──
+  async function handlePassword() {
+    if(!ready||!email.trim()||!password.trim()) return;
     setLoading(true); setErr("");
     try {
-      // Try sign-in first
-      await signIn.create({ strategy:"email_code", identifier:email });
-      setMode("in"); setStep("code");
+      const r = await signIn.create({ identifier:email, password });
+      if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
     } catch(e) {
-      const code=e.errors?.[0]?.code;
-      console.error("sign-in error:", code, e.errors);
-      // If no account, auto sign-up instead
-      if(code==="form_identifier_not_found"||code==="form_password_incorrect") {
+      const ec=e.errors?.[0]?.code;
+      if(ec==="form_identifier_not_found") {
+        // New user — create account
         try {
-          await signUp.create({ emailAddress:email });
+          await signUp.create({ emailAddress:email, password });
           await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
-          setMode("up"); setStep("code");
-        } catch(e2) {
-          console.error("sign-up error:", e2.errors);
-          setErr(e2.errors?.[0]?.message||"Something went wrong");
-        }
+          setIsNew(true); setStep("verify");
+        } catch(e2) { setErr(e2.errors?.[0]?.message||"Sign up failed"); }
       } else {
-        setErr(`${e.errors?.[0]?.message||"Something went wrong"} (${code||"unknown"})`);
+        setErr(e.errors?.[0]?.message||"Invalid email or password");
       }
     }
     setLoading(false);
   }
 
-  async function handleCode() {
+  // ── Email code flow ──
+  async function handleSendCode() {
+    if(!ready||!email.trim()) return;
+    setLoading(true); setErr("");
+    try {
+      await signIn.create({ strategy:"email_code", identifier:email });
+      setIsNew(false); setStep("verify");
+    } catch(e) {
+      const ec=e.errors?.[0]?.code;
+      if(ec==="form_identifier_not_found") {
+        try {
+          await signUp.create({ emailAddress:email });
+          await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
+          setIsNew(true); setStep("verify");
+        } catch(e2) { setErr(e2.errors?.[0]?.message||"Sign up failed"); }
+      } else {
+        setErr(e.errors?.[0]?.message||"Could not send code");
+      }
+    }
+    setLoading(false);
+  }
+
+  // ── Verify 6-digit code ──
+  async function handleVerify() {
     if(!ready||code.length!==6) return;
     setLoading(true); setErr("");
     try {
-      if(mode==="in") {
-        const r = await signIn.attemptFirstFactor({ strategy:"email_code", code });
-        if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
-      } else {
+      if(isNew) {
         const r = await signUp.attemptEmailAddressVerification({ code });
         if(r.status==="complete") await setSuActive({ session:r.createdSessionId });
+      } else {
+        const r = await signIn.attemptFirstFactor({ strategy:"email_code", code });
+        if(r.status==="complete") await setSiActive({ session:r.createdSessionId });
       }
     } catch(e) { setErr(e.errors?.[0]?.message||"Invalid code"); }
     setLoading(false);
   }
 
+  const btnStyle = (active) => ({
+    width:"100%",padding:"16px",borderRadius:16,border:"none",cursor:"pointer",
+    fontSize:16,fontWeight:700,
+    background:active&&!loading?ACC:"rgba(255,255,255,0.08)",
+    color:active&&!loading?"#fff":T2,
+  });
+
   return (
     <div style={{...PAGE,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 32px"}}>
-      {/* Required anchor for Clerk CAPTCHA in custom flows */}
       <div id="clerk-captcha"/>
       <div style={{fontSize:44,marginBottom:16}}>✦</div>
       <div style={{fontSize:28,fontWeight:800,color:T1,marginBottom:6,textAlign:"center"}}>Life OS</div>
-      <div style={{fontSize:14,color:T2,marginBottom:40,textAlign:"center",lineHeight:1.5}}>
-        Sign in or create an account<br/>to sync your tasks everywhere
+      <div style={{fontSize:14,color:T2,marginBottom:28,textAlign:"center",lineHeight:1.5}}>
+        Sign in or create an account
       </div>
-      {step==="email" ? (
+
+      {step==="form" ? (
         <>
+          {/* Method toggle */}
+          <div style={{...gl(),borderRadius:14,padding:4,display:"flex",marginBottom:20,width:"100%"}}>
+            {[{id:"password",label:"Password"},{id:"code",label:"Email code"}].map(m=>(
+              <button key={m.id} onClick={()=>{setMethod(m.id);setErr("");}}
+                style={{flex:1,padding:"9px 0",borderRadius:11,border:"none",cursor:"pointer",
+                  background:method===m.id?ACC:"transparent",
+                  color:method===m.id?"#fff":T2,fontSize:14,fontWeight:700}}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+
           <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&handleEmail()} placeholder="your@email.com" autoFocus
-            style={{...IS,marginBottom:12,textAlign:"center",fontSize:17}}/>
+            onKeyDown={e=>e.key==="Enter"&&(method==="password"?handlePassword():handleSendCode())}
+            placeholder="your@email.com" autoFocus
+            style={{...IS,marginBottom:12,fontSize:16}}/>
+
+          {method==="password" && (
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&handlePassword()}
+              placeholder="Password"
+              style={{...IS,marginBottom:12,fontSize:16}}/>
+          )}
+
           {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
-          <button onClick={handleEmail} disabled={!email.trim()||loading||!ready}
-            style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
-              background:email.trim()&&!loading?ACC:"rgba(255,255,255,0.08)",
-              color:email.trim()&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer"}}>
-            {loading?"Checking…":"Continue →"}
+
+          <button
+            onClick={method==="password"?handlePassword:handleSendCode}
+            disabled={!email.trim()||loading||!ready||(method==="password"&&!password.trim())}
+            style={btnStyle(email.trim()&&(method==="code"||password.trim()))}>
+            {loading?"Please wait…":method==="password"?"Continue →":"Send code →"}
           </button>
         </>
       ) : (
         <>
           <div style={{...gl(),borderRadius:14,padding:"10px 16px",marginBottom:20,display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:12,color:mode==="up"?"#34C759":ACC,fontWeight:700}}>
-              {mode==="up"?"New account":"Welcome back"}
+            <span style={{fontSize:12,color:isNew?"#34C759":ACC,fontWeight:700}}>
+              {isNew?"New account":"Welcome back"}
             </span>
             <span style={{fontSize:12,color:T2}}>{email}</span>
           </div>
@@ -551,18 +601,15 @@ function LoginScreen() {
             Enter the 6-digit code sent to your email
           </div>
           <input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))}
-            onKeyDown={e=>e.key==="Enter"&&handleCode()} placeholder="000000" maxLength={6} autoFocus
+            onKeyDown={e=>e.key==="Enter"&&handleVerify()} placeholder="000000" maxLength={6} autoFocus
             style={{...IS,marginBottom:12,textAlign:"center",fontSize:28,letterSpacing:10,fontWeight:700}}/>
           {err&&<div style={{fontSize:13,color:PINK,marginBottom:10,textAlign:"center"}}>{err}</div>}
-          <button onClick={handleCode} disabled={code.length!==6||loading}
-            style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
-              background:code.length===6&&!loading?ACC:"rgba(255,255,255,0.08)",
-              color:code.length===6&&!loading?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer",marginBottom:12}}>
-            {loading?"Verifying…":mode==="up"?"Create account →":"Sign in →"}
+          <button onClick={handleVerify} disabled={code.length!==6||loading} style={btnStyle(code.length===6)}>
+            {loading?"Verifying…":isNew?"Create account →":"Sign in →"}
           </button>
-          <button onClick={()=>{setStep("email");setCode("");setErr("");}}
-            style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer"}}>
-            ← Use different email
+          <button onClick={()=>{setStep("form");setCode("");setErr("");}}
+            style={{background:"none",border:"none",color:T2,fontSize:13,cursor:"pointer",marginTop:12}}>
+            ← Back
           </button>
         </>
       )}
