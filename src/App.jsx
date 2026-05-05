@@ -786,6 +786,85 @@ function ChangePasswordSheet({ onClose }) {
 }
 
 // ─────────────────────────────────────────
+// PROFILE SHEET
+// ─────────────────────────────────────────
+function ProfileSheet({ onClose, onChangePw, onSignOut }) {
+  const { user } = useUser();
+  const [firstName, setFirstName] = useState(user?.firstName||"");
+  const [lastName,  setLastName]  = useState(user?.lastName||"");
+  const [loading,   setLoading]   = useState(false);
+  const [saved,     setSaved]     = useState(false);
+  const [err,       setErr]       = useState("");
+
+  const email    = user?.primaryEmailAddress?.emailAddress||"";
+  const initials = ((user?.firstName||"")[0]||(email[0]||"?")).toUpperCase();
+
+  async function saveProfile() {
+    setLoading(true); setErr(""); setSaved(false);
+    try {
+      await user.update({ firstName:firstName.trim(), lastName:lastName.trim() });
+      setSaved(true);
+      setTimeout(()=>setSaved(false),2000);
+    } catch(e) {
+      setErr(e.errors?.[0]?.message||"Could not update profile.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <Sheet onClose={onClose} tall>
+      <div style={{fontSize:20,fontWeight:800,color:T1,marginBottom:24}}>Profile</div>
+
+      {/* Avatar */}
+      <div style={{width:64,height:64,borderRadius:32,background:ACC,display:"flex",alignItems:"center",
+        justifyContent:"center",fontSize:26,fontWeight:800,color:"#fff",margin:"0 auto 24px"}}>
+        {initials}
+      </div>
+
+      {err&&<div style={{...gl(),borderRadius:12,padding:"12px 14px",marginBottom:14,
+        border:`1px solid ${PINK}40`,background:`${PINK}12`,
+        fontSize:13,color:"rgba(255,255,255,0.9)",lineHeight:1.5}}>{err}</div>}
+      {saved&&<div style={{...gl(),borderRadius:12,padding:"12px 14px",marginBottom:14,
+        border:"1px solid #34C75940",background:"#34C75912",
+        fontSize:13,color:"#34C759",fontWeight:600}}>Profile updated</div>}
+
+      <Lbl>First name</Lbl>
+      <input value={firstName} onChange={e=>setFirstName(e.target.value)}
+        placeholder="First name" style={{...IS,marginBottom:12}}/>
+
+      <Lbl>Last name</Lbl>
+      <input value={lastName} onChange={e=>setLastName(e.target.value)}
+        placeholder="Last name" style={{...IS,marginBottom:12}}/>
+
+      <Lbl>Email</Lbl>
+      <div style={{...IS,marginBottom:24,color:T2,cursor:"default",userSelect:"text"}}>{email}</div>
+
+      <button onClick={saveProfile} disabled={loading}
+        style={{width:"100%",padding:"15px",borderRadius:16,border:"none",cursor:"pointer",
+          background:loading?  "rgba(255,255,255,0.08)":ACC,
+          color:loading?T2:"#fff",fontSize:16,fontWeight:700,marginBottom:20}}>
+        {loading?"Saving…":"Save changes"}
+      </button>
+
+      <div style={{height:1,background:BORD,marginBottom:16}}/>
+
+      <button onClick={onChangePw}
+        style={{width:"100%",padding:"14px 18px",borderRadius:14,border:`1px solid ${BORD}`,
+          background:"rgba(255,255,255,0.04)",color:T1,fontSize:15,fontWeight:600,
+          cursor:"pointer",textAlign:"left",marginBottom:10}}>
+        Change password
+      </button>
+      <button onClick={onSignOut}
+        style={{width:"100%",padding:"14px 18px",borderRadius:14,border:`1px solid ${PINK}30`,
+          background:`${PINK}10`,color:PINK,fontSize:15,fontWeight:600,
+          cursor:"pointer",textAlign:"left"}}>
+        Sign out
+      </button>
+    </Sheet>
+  );
+}
+
+// ─────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────
 export default function App() {
@@ -813,7 +892,6 @@ export default function App() {
 
   // ── Clerk auth ──
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useAuth();
-  const { user } = useUser();
   const [syncEnabled,   setSyncEnabled]   = useState(false);
   const [showProfile,   setShowProfile]   = useState(false);
   const [showChangePw,  setShowChangePw]  = useState(false);
@@ -1063,7 +1141,9 @@ export default function App() {
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <button onClick={()=>setShowProfile(true)}
-                style={{width:36,height:36,borderRadius:18,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",fontSize:16,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>⚙</button>
+                style={{padding:"6px 14px",borderRadius:20,background:"rgba(255,255,255,0.07)",border:"none",cursor:"pointer",fontSize:12,fontWeight:700,color:T2}}>
+                Account
+              </button>
               <button onClick={()=>{ setNewT({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""}); setView("new-task"); }}
                 style={{width:46,height:46,borderRadius:23,background:ACC,border:"none",cursor:"pointer",fontSize:24,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>+</button>
             </div>
@@ -1233,24 +1313,12 @@ export default function App() {
       {sharedDetail}
       {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
-      {/* Profile / settings sheet */}
       {showProfile && !showChangePw && (
-        <Sheet onClose={()=>setShowProfile(false)}>
-          <div style={{fontSize:20,fontWeight:800,color:T1,marginBottom:6}}>Account</div>
-          <div style={{fontSize:13,color:T2,marginBottom:24}}>{user?.primaryEmailAddress?.emailAddress}</div>
-          <button onClick={()=>setShowChangePw(true)}
-            style={{width:"100%",padding:"15px 18px",borderRadius:16,border:`1px solid ${BORD}`,
-              background:"rgba(255,255,255,0.05)",color:T1,fontSize:15,fontWeight:600,
-              cursor:"pointer",textAlign:"left",marginBottom:10}}>
-            🔑 Change password
-          </button>
-          <button onClick={()=>{ signOut(); setShowProfile(false); }}
-            style={{width:"100%",padding:"15px 18px",borderRadius:16,border:`1px solid ${PINK}30`,
-              background:`${PINK}10`,color:PINK,fontSize:15,fontWeight:600,
-              cursor:"pointer",textAlign:"left"}}>
-            Sign out
-          </button>
-        </Sheet>
+        <ProfileSheet
+          onClose={()=>setShowProfile(false)}
+          onChangePw={()=>setShowChangePw(true)}
+          onSignOut={()=>{ signOut(); setShowProfile(false); }}
+        />
       )}
       {showChangePw && <ChangePasswordSheet onClose={()=>{ setShowChangePw(false); setShowProfile(false); }}/>}
     </div>
