@@ -483,15 +483,20 @@ function LoginScreen() {
       await signIn.create({ strategy:"email_code", identifier:email });
       setMode("in"); setStep("code");
     } catch(e) {
+      const code=e.errors?.[0]?.code;
+      console.error("sign-in error:", code, e.errors);
       // If no account, auto sign-up instead
-      if(e.errors?.[0]?.code==="form_identifier_not_found") {
+      if(code==="form_identifier_not_found"||code==="form_password_incorrect") {
         try {
           await signUp.create({ emailAddress:email });
           await signUp.prepareEmailAddressVerification({ strategy:"email_code" });
           setMode("up"); setStep("code");
-        } catch(e2) { setErr(e2.errors?.[0]?.message||"Something went wrong"); }
+        } catch(e2) {
+          console.error("sign-up error:", e2.errors);
+          setErr(e2.errors?.[0]?.message||"Something went wrong");
+        }
       } else {
-        setErr(e.errors?.[0]?.message||"Something went wrong");
+        setErr(`${e.errors?.[0]?.message||"Something went wrong"} (${code||"unknown"})`);
       }
     }
     setLoading(false);
