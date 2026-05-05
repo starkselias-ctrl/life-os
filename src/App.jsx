@@ -8,54 +8,19 @@ const BORD = "rgba(255,255,255,0.08)";
 const T1   = "#FFFFFF";
 const T2   = "#8E8E9A";
 
+// Generic starter areas shown to every new user
 const DEFAULT_AREAS = [
-  { id:"work",      label:"Work",      sub:"Salesforce & clients", icon:"⌘" },
-  { id:"amsterdam", label:"Amsterdam", sub:"Relocation & DAFT",    icon:"✈" },
-  { id:"health",    label:"Health",    sub:"Body & mind",           icon:"◎" },
-  { id:"finances",  label:"Finances",  sub:"Money & banking",       icon:"$" },
-  { id:"personal",  label:"Personal",  sub:"Life admin",            icon:"⊙" },
-  { id:"creative",  label:"Creative",  sub:"Ideas & projects",      icon:"✦" },
-  { id:"social",    label:"Social",    sub:"People & plans",        icon:"◈" },
-  { id:"inbox",     label:"Inbox",     sub:"Unsorted capture",      icon:"⊕" },
+  { id:"work",     label:"Work",     sub:"Projects & clients", icon:"⌘" },
+  { id:"personal", label:"Personal", sub:"Life admin",         icon:"⊙" },
+  { id:"health",   label:"Health",   sub:"Body & mind",        icon:"◎" },
+  { id:"finances", label:"Finances", sub:"Money & banking",    icon:"$" },
+  { id:"creative", label:"Creative", sub:"Ideas & projects",   icon:"✦" },
+  { id:"social",   label:"Social",   sub:"People & plans",     icon:"◈" },
+  { id:"inbox",    label:"Inbox",    sub:"Unsorted capture",   icon:"⊕" },
 ];
 
-const DEFAULT_TASKS = [
-  {id:1,  text:"Finalize Havis Apex routing logic",  area:"work",      done:false,priority:"high",due:"",time:"09:00",dur:90, desc:"",notes:"",subtasks:[
-    {id:"1a",text:"Write Apex class skeleton",done:false},
-    {id:"1b",text:"Map 21 routing rules",done:false},
-    {id:"1c",text:"Test across 5 queues",done:false},
-  ]},
-  {id:2,  text:"Embed Agentforce on Havis website",  area:"work",      done:false,priority:"high",due:"",time:"11:00",dur:60, desc:"",notes:"",subtasks:[]},
-  {id:3,  text:"Berla flow migration — next phase",  area:"work",      done:false,priority:"med", due:"",time:"14:00",dur:60, desc:"",notes:"",subtasks:[]},
-  {id:4,  text:"Submit DAFT application",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[
-    {id:"4a",text:"Complete form 7524",done:false},
-    {id:"4b",text:"Attach appendix 7601",done:false},
-    {id:"4c",text:"Attach appendix 7675",done:false},
-    {id:"4d",text:"Submit to IND",done:false},
-  ]},
-  {id:5,  text:"Sign 12-month lease",                area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
-  {id:6,  text:"Obtain BSN via gemeente",            area:"amsterdam", done:false,priority:"high",due:"",time:"",    dur:45, desc:"",notes:"",subtasks:[
-    {id:"6a",text:"Book gemeente appointment",done:false},
-    {id:"6b",text:"Bring passport + proof of address",done:false},
-    {id:"6c",text:"Collect BSN number",done:false},
-  ]},
-  {id:7,  text:"Sign up for utilities",              area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:"",subtasks:[]},
-  {id:8,  text:"Get essentials for apartment",       area:"amsterdam", done:false,priority:"med", due:"",time:"16:00",dur:60, desc:"",notes:"",subtasks:[
-    {id:"8a",text:"Bedding & pillows",done:false},
-    {id:"8b",text:"Kitchen basics",done:false},
-    {id:"8c",text:"Bathroom supplies",done:false},
-  ]},
-  {id:9,  text:"Decide ZZP vs BV structure",         area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
-  {id:10, text:"Research 30% ruling eligibility",    area:"amsterdam", done:false,priority:"med", due:"",time:"",    dur:20, desc:"",notes:"",subtasks:[]},
-  {id:11, text:"Morning workout",                    area:"health",    done:false,priority:"med", due:"",time:"07:00",dur:45, desc:"",notes:"",subtasks:[]},
-  {id:12, text:"Skincare — set up in new place",     area:"health",    done:false,priority:"low", due:"",time:"",    dur:15, desc:"",notes:"",subtasks:[]},
-  {id:13, text:"Open Dutch bank account",            area:"finances",  done:false,priority:"high",due:"",time:"10:00",dur:45, desc:"",notes:"",subtasks:[
-    {id:"13a",text:"Research Bunq vs Revolut vs ING",done:false},
-    {id:"13b",text:"Gather required documents",done:false},
-    {id:"13c",text:"Submit application",done:false},
-  ]},
-  {id:14, text:"Review monthly budget",              area:"finances",  done:false,priority:"med", due:"",time:"",    dur:30, desc:"",notes:"",subtasks:[]},
-];
+// New users start with no tasks
+const DEFAULT_TASKS = [];
 
 const ICONS = ["⌘","✈","◎","$","⊙","✦","◈","⊕","♡","★","◆","▲","●","◐","⬡","⚡","✿","☀","♫","⚙","✎","⊞","⊟","⊠"];
 const PRI = { high:{label:"Urgent",color:PINK}, med:{label:"Normal",color:ACC}, low:{label:"Later",color:"#636370"} };
@@ -761,7 +726,7 @@ export default function App() {
   const [messages,  setMessages]  = useState([]); // conversation thread
 
   // ── Clerk auth ──
-  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
+  const { isLoaded, isSignedIn, userId, getToken, signOut } = useAuth();
   const [syncEnabled, setSyncEnabled] = useState(false);
 
   const tasksRef      = useRef(tasks);
@@ -788,15 +753,27 @@ export default function App() {
   }
 
   useEffect(()=>{
-    if(!isSignedIn) return;
+    if(!isSignedIn||!userId) return;
+    const lastId=localStorage.getItem("los_userid");
+    const switched=lastId&&lastId!==userId;
+    if(switched){
+      localStorage.removeItem("los_areas");
+      localStorage.removeItem("los_tasks");
+    }
+    localStorage.setItem("los_userid",userId);
     Promise.all([authFetch("/api/areas"),authFetch("/api/tasks")]).then(async([ar,tr])=>{
       const aData=await ar.json(); const tData=await tr.json();
-      if(aData?.length) setAreas(aData);
-      if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
+      // Different user: reset to clean defaults then apply whatever Neon has
+      if(switched){
+        setAreas(aData?.length ? aData : DEFAULT_AREAS);
+        setTasks(tData?.length ? tData.map(t=>({subtasks:[],...t})) : []);
+      } else {
+        if(aData?.length) setAreas(aData);
+        if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
+      }
       setSyncEnabled(true);
     });
-   
-  },[isSignedIn]);
+  },[isSignedIn,userId]);
 
   // ── Debounced sync to Neon on change ──
   useEffect(()=>{
