@@ -479,21 +479,22 @@ export default function App() {
   const [editingArea, setEditingArea] = useState(null);
   const [areaForm,    setAreaForm]    = useState({label:"",sub:"",icon:"⊙"});
   const [confirmDel,  setConfirmDel]  = useState(null);
-  const [aiMode,   setAiMode]   = useState("brain");
-  const [aiInput,  setAiInput]  = useState("");
-  const [aiResult, setAiResult] = useState(null);
-  const [aiLoad,   setAiLoad]   = useState(false);
-  const [aiErr,    setAiErr]    = useState("");
-  const [pending,  setPending]  = useState([]);
+  const [aiMode,    setAiMode]    = useState("brain");
+  const [aiInput,   setAiInput]   = useState("");
+  const [aiLoad,    setAiLoad]    = useState(false);
+  const [aiErr,     setAiErr]     = useState("");
+  const [messages,  setMessages]  = useState([]); // conversation thread
 
   const tasksRef      = useRef(tasks);
   const editFormRef   = useRef(editForm);
   const activeAreaRef = useRef(activeArea);
   const newTRef       = useRef(newT);
-  useEffect(()=>{ tasksRef.current    = tasks;      },[tasks]);
-  useEffect(()=>{ editFormRef.current = editForm;   },[editForm]);
+  const messagesRef   = useRef(messages);
+  useEffect(()=>{ tasksRef.current      = tasks;    },[tasks]);
+  useEffect(()=>{ editFormRef.current   = editForm; },[editForm]);
   useEffect(()=>{ activeAreaRef.current = activeArea; },[activeArea]);
-  useEffect(()=>{ newTRef.current     = newT;       },[newT]);
+  useEffect(()=>{ newTRef.current       = newT;     },[newT]);
+  useEffect(()=>{ messagesRef.current   = messages; },[messages]);
 
   useEffect(()=>save("los_areas",areas),[areas]);
   useEffect(()=>save("los_tasks",tasks),[tasks]);
@@ -564,10 +565,24 @@ export default function App() {
   },[]);
 
   const runAI = useCallback(async()=>{
-    const input=aiInput; const mode=aiMode;
-    if(!input.trim()) return;
-    setAiLoad(true); setAiErr(""); setAiResult(null); setPending([]);
+    const input=aiInput.trim(); const mode=aiMode;
+    if(!input||aiLoad) return;
+    const userMsg={id:uid(),role:"user",text:input};
+    const history=messagesRef.current;
+    setMessages(prev=>[...prev,userMsg]);
+    setAiInput(""); setAiLoad(true); setAiErr("");
     try{
+      // Build full conversation for the API
+      const apiMsgs=[...history,userMsg].map(m=>({
+        role:m.role,
+        content:m.role==="user"
+          ? (history.length===0&&mode==="email"
+              ?`Extract all actions from this email and build tasks with subtasks:\n\n${m.text}`
+              : history.length===0
+              ?`${m.text}\n\nResearch this thoroughly using web search if needed. Build me tasks with detailed subtasks I can act on immediately.`
+              : m.text)
+          : m.text
+      }));
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",headers:{
           "Content-Type":"application/json",
@@ -580,16 +595,13 @@ export default function App() {
           max_tokens:2000,
           system:AI_SYS,
           tools:[{type:"web_search_20250305",name:"web_search"}],
-          messages:[{role:"user",content:mode==="email"
-            ?`Extract all actions from this email and build tasks with subtasks:\n\n${input}`
-            :`${input}\n\nResearch this thoroughly using web search if needed. Build me tasks with detailed subtasks I can act on immediately.`
-          }]
+          messages:apiMsgs,
         })
       });
       const d=await res.json();
       if(!res.ok){
         const msg=d?.error?.message||`API error ${res.status}`;
-        if(res.status===429) throw new Error("Rate limit or no credits — add billing at console.anthropic.com");
+        if(res.status===429) throw new Error("Rate limit — wait 30s and try again");
         if(res.status===401) throw new Error("Invalid API key — check VITE_ANTHROPIC_KEY");
         throw new Error(msg);
       }
@@ -597,27 +609,21 @@ export default function App() {
       const raw=textBlock?.text||"";
       const cleaned=raw.replace(/```json|```/g,"").trim();
       const jsonMatch=cleaned.match(/\{[\s\S]*\}/);
-      if(!jsonMatch) throw new Error("No JSON found");
+      if(!jsonMatch) throw new Error("No JSON found in response");
       const parsed=JSON.parse(jsonMatch[0]);
-      setAiResult(parsed);
-      setPending((parsed.tasks||[]).map(t=>({
-        ...t,id:uid(),done:false,desc:t.notes||"",notes:"",sel:true,
+      const tasks=(parsed.tasks||[]).map(t=>({
+        ...t,id:uid(),done:false,desc:t.notes||"",notes:"",
         subtasks:(t.subtasks||[]).map(s=>({id:uid(),text:s.text||s,done:false}))
-      })));
+      }));
+      const assistantMsg={id:uid(),role:"assistant",text:raw,parsed,tasks,tasksAdded:false};
+      setMessages(prev=>[...prev,assistantMsg]);
     }catch(e){
       setAiErr(e.message||"Something went wrong. Try again.");
+      setMessages(prev=>prev.filter(m=>m.id!==userMsg.id));
       console.error(e);
     }
     setAiLoad(false);
-  },[aiInput,aiMode]);
-
-  const addPending = useCallback(()=>{
-    setPending(ps=>{
-      setTasks(ts=>[...ts,...ps.filter(p=>p.sel).map(p=>{ const {sel,...t}=p; void sel; return t; })]);
-      return [];
-    });
-    setView("home"); setTab("home"); setAiResult(null); setAiInput("");
-  },[]);
+  },[aiInput,aiMode,aiLoad]);
 
   const urgent    = useMemo(()=>tasks.filter(t=>t.priority==="high"&&!t.done),[tasks]);
   const scheduled = useMemo(()=>[...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time)),[tasks]);
@@ -983,117 +989,157 @@ export default function App() {
   // ══════════════════════════════════
   // AI
   // ══════════════════════════════════
-  if(view==="ai") return (
-    <div style={PAGE}>
-      <div style={{position:"relative",zIndex:1,paddingBottom:110}}>
-        <div style={{padding:"52px 20px 20px"}}>
-          <div style={{fontSize:34,fontWeight:800,color:T1,letterSpacing:-1,marginBottom:4}}>AI Assistant</div>
-          <div style={{fontSize:14,color:T2,marginBottom:20}}>Brain dump or paste an email.</div>
-          <div style={{...gl(),borderRadius:14,padding:4,display:"flex",marginBottom:20}}>
+  if(view==="ai"){
+    function addMsgTasks(msg){
+      setTasks(ts=>[...ts,...msg.tasks]);
+      setMessages(prev=>prev.map(m=>m.id===msg.id?{...m,tasksAdded:true}:m));
+    }
+    const hasConvo=messages.length>0;
+    return (
+    <div style={{...PAGE,display:"flex",flexDirection:"column"}}>
+      {/* ── Fixed header ── */}
+      <div style={{padding:"52px 20px 12px",flexShrink:0}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:26,fontWeight:800,color:T1,letterSpacing:-0.5}}>AI Assistant</div>
+          {hasConvo&&(
+            <button onClick={()=>{ setMessages([]); setAiInput(""); setAiErr(""); }}
+              style={{fontSize:12,fontWeight:700,color:T2,background:"rgba(255,255,255,0.08)",border:"none",borderRadius:20,padding:"6px 14px",cursor:"pointer"}}>
+              New ↺
+            </button>
+          )}
+        </div>
+        {/* Mode toggle — shown only before first message */}
+        {!hasConvo&&(
+          <div style={{...gl(),borderRadius:14,padding:4,display:"flex",marginTop:16}}>
             {[{id:"brain",label:"✦ Brain dump"},{id:"email",label:"✉ Email"}].map(m=>(
-              <button key={m.id} onClick={()=>{ setAiMode(m.id); setAiResult(null); setPending([]); setAiInput(""); }}
+              <button key={m.id} onClick={()=>setAiMode(m.id)}
                 style={{flex:1,padding:"9px 0",borderRadius:11,border:"none",background:aiMode===m.id?ACC:"transparent",color:aiMode===m.id?"#fff":T2,fontSize:14,fontWeight:700,cursor:"pointer"}}>
                 {m.label}
               </button>
             ))}
           </div>
-          {!aiResult && !aiLoad && (
-            <>
-              <textarea autoFocus value={aiInput} onChange={e=>setAiInput(e.target.value)}
-                placeholder={aiMode==="brain"?"Type anything — a goal, problem, brain dump…":"Paste full email here…"}
-                style={{...IS,resize:"none",minHeight:aiMode==="email"?180:130,marginBottom:12,lineHeight:1.5}}/>
-              {aiErr && (
-                <div style={{...gl(),borderRadius:16,padding:"16px",marginBottom:12,border:`1px solid ${PINK}40`,background:`${PINK}15`}}>
-                  <div style={{fontSize:13,fontWeight:700,color:PINK,marginBottom:6}}>Something went wrong</div>
-                  <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",lineHeight:1.5,marginBottom:12}}>{aiErr}</div>
-                  <button onClick={()=>setAiErr("")}
-                    style={{padding:"8px 16px",borderRadius:10,border:"none",background:`${PINK}20`,color:PINK,fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                    Dismiss
-                  </button>
+        )}
+      </div>
+
+      {/* ── Conversation thread ── */}
+      <div style={{flex:1,overflowY:"auto",padding:"0 20px",paddingBottom:160}}>
+        {/* Empty state */}
+        {!hasConvo&&!aiLoad&&(
+          <div style={{paddingTop:20,color:T2,fontSize:14,lineHeight:1.7}}>
+            {aiMode==="brain"
+              ? "Type anything — a goal, a problem, a question. I'll research it and build tasks."
+              : "Paste a full email. I'll extract every action and build tasks with subtasks."}
+          </div>
+        )}
+
+        {/* Messages */}
+        {messages.map(m=>(
+          <div key={m.id} style={{marginBottom:16}}>
+            {m.role==="user"?(
+              /* User bubble */
+              <div style={{display:"flex",justifyContent:"flex-end"}}>
+                <div style={{maxWidth:"80%",background:ACC,borderRadius:"18px 18px 4px 18px",padding:"12px 16px"}}>
+                  <div style={{fontSize:14,color:"#fff",lineHeight:1.5}}>{m.text}</div>
                 </div>
-              )}
-              <button onClick={runAI} disabled={!aiInput.trim()}
-                style={{width:"100%",padding:"16px",borderRadius:16,border:"none",
-                  background:!aiInput.trim()?"rgba(255,255,255,0.08)":ACC,
-                  color:!aiInput.trim()?T2:"#fff",
-                  fontSize:17,fontWeight:700,cursor:"pointer"}}>
-                {aiMode==="brain"?"Research & break it down ↗":"Extract tasks ↗"}
-              </button>
-            </>
-          )}
-          {aiLoad && (
-            <div style={{...gl(),borderRadius:20,padding:"36px 24px",textAlign:"center",marginBottom:12}}>
-              <div className="ai-spinner" style={{margin:"0 auto 20px"}}/>
-              <div style={{fontSize:17,fontWeight:700,color:T1,marginBottom:6}}>Working on it…</div>
-              <div style={{fontSize:13,color:T2,marginBottom:20,lineHeight:1.5}}>
-                Searching the web and building<br/>your tasks with subtasks
               </div>
-              <div style={{display:"flex",justifyContent:"center",gap:8}}>
-                <div className="ai-dot"/>
-                <div className="ai-dot"/>
-                <div className="ai-dot"/>
-              </div>
-            </div>
-          )}
-          {aiResult && (
-            <div>
-              <div style={{...gl(),borderRadius:16,padding:"14px 16px",marginBottom:12,fontSize:15,color:"rgba(255,255,255,0.85)",lineHeight:1.6}}>{stripTags(aiResult.summary)}</div>
-              {aiResult.research && <InfoCard color="#FF9F0A" label="Options found" text={stripTags(aiResult.research)} bg="rgba(255,159,10,0.12)" border="rgba(255,159,10,0.25)"/>}
-              {aiResult.insight  && <InfoCard color={ACC} label="Key insight" text={stripTags(aiResult.insight)} bg={`${ACC}15`} border={`${ACC}35`}/>}
-              {aiResult.timeline?.length>0 && (
-                <div style={{...gl(),borderRadius:16,padding:"14px 16px",marginBottom:12}}>
-                  <Lbl>Timeline</Lbl>
-                  {aiResult.timeline.map((w,i)=>(
-                    <div key={i} style={{display:"flex",gap:12,marginBottom:8}}>
-                      <div style={{fontSize:11,color:ACC,minWidth:76,paddingTop:2,fontWeight:700}}>{w.week}</div>
-                      <div style={{fontSize:14,color:"rgba(255,255,255,0.8)",flex:1,lineHeight:1.4}}>{w.focus}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <Lbl>Tasks — {pending.filter(p=>p.sel).length} selected</Lbl>
-              <div style={{...gl(),borderRadius:18,overflow:"hidden",marginBottom:14}}>
-                {pending.map((p,i)=>{
-                  const a=getArea(areas,p.area);
-                  return (
-                    <div key={p.id}>
-                      <div onClick={()=>setPending(ps=>ps.map(x=>x.id===p.id?{...x,sel:!x.sel}:x))}
-                        style={{display:"flex",gap:12,padding:"14px 16px",cursor:"pointer",opacity:p.sel?1:0.35}}>
-                        <div style={{width:24,height:24,borderRadius:12,border:`2px solid ${p.sel?ACC:BORD}`,background:p.sel?ACC:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",marginTop:2}}>
-                          {p.sel && <span style={{color:"#fff",fontSize:12}}>✓</span>}
-                        </div>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:15,fontWeight:600,color:T1,marginBottom:4,lineHeight:1.3}}>{p.text}</div>
-                          {p.notes && <div style={{fontSize:12,color:T2,marginBottom:4}}>{p.notes}</div>}
-                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                            <span style={{fontSize:11,fontWeight:600,padding:"2px 9px",borderRadius:20,background:`${ACC}20`,color:ACC}}>{a.label}</span>
-                            <span style={{fontSize:11,fontWeight:600,padding:"2px 9px",borderRadius:20,background:PRI[p.priority].color+"20",color:PRI[p.priority].color}}>{PRI[p.priority].label}</span>
-                            {p.time && <span style={{fontSize:11,padding:"2px 9px",borderRadius:20,background:"rgba(255,255,255,0.08)",color:T2}}>{fmt(p.time)} · {p.dur}m</span>}
-                          </div>
-                        </div>
+            ):(
+              /* Assistant response */
+              <div>
+                {m.parsed?.summary&&(
+                  <div style={{...gl(),borderRadius:16,padding:"14px 16px",marginBottom:8,fontSize:14,color:"rgba(255,255,255,0.9)",lineHeight:1.6}}>
+                    {stripTags(m.parsed.summary)}
+                  </div>
+                )}
+                {m.parsed?.research&&<InfoCard color="#FF9F0A" label="Options found" text={stripTags(m.parsed.research)} bg="rgba(255,159,10,0.12)" border="rgba(255,159,10,0.25)"/>}
+                {m.parsed?.insight&&<InfoCard color={ACC} label="Key insight" text={stripTags(m.parsed.insight)} bg={`${ACC}15`} border={`${ACC}35`}/>}
+                {m.parsed?.timeline?.length>0&&(
+                  <div style={{...gl(),borderRadius:16,padding:"14px 16px",marginBottom:8}}>
+                    <Lbl>Timeline</Lbl>
+                    {m.parsed.timeline.map((w,i)=>(
+                      <div key={i} style={{display:"flex",gap:12,marginBottom:i<m.parsed.timeline.length-1?8:0}}>
+                        <div style={{fontSize:11,color:ACC,minWidth:68,paddingTop:2,fontWeight:700}}>{w.week}</div>
+                        <div style={{fontSize:13,color:"rgba(255,255,255,0.8)",flex:1,lineHeight:1.4}}>{w.focus}</div>
                       </div>
-                      {i<pending.length-1 && <div style={{height:1,background:BORD,marginLeft:52}}/>}
+                    ))}
+                  </div>
+                )}
+                {m.tasks?.length>0&&(
+                  <div style={{...gl(),borderRadius:16,overflow:"hidden",marginBottom:8}}>
+                    <div style={{padding:"12px 16px 8px",fontSize:11,fontWeight:700,color:T2,textTransform:"uppercase",letterSpacing:1}}>
+                      Tasks to add
                     </div>
-                  );
-                })}
+                    {m.tasks.map((t,i)=>{
+                      const a=getArea(areas,t.area);
+                      return (
+                        <div key={t.id}>
+                          <div style={{padding:"10px 16px"}}>
+                            <div style={{fontSize:14,fontWeight:600,color:T1,lineHeight:1.3,marginBottom:3}}>{t.text}</div>
+                            <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                              <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:`${ACC}20`,color:ACC}}>{a.label}</span>
+                              <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:20,background:PRI[t.priority]?.color+"20",color:PRI[t.priority]?.color}}>{PRI[t.priority]?.label}</span>
+                              {t.subtasks?.length>0&&<span style={{fontSize:10,color:T2}}>{t.subtasks.length} subtasks</span>}
+                            </div>
+                          </div>
+                          {i<m.tasks.length-1&&<div style={{height:1,background:BORD,marginLeft:16}}/>}
+                        </div>
+                      );
+                    })}
+                    <div style={{padding:"10px 16px",borderTop:`1px solid ${BORD}`}}>
+                      {m.tasksAdded?(
+                        <div style={{fontSize:13,fontWeight:700,color:"#34C759"}}>✓ Added to your tasks</div>
+                      ):(
+                        <button onClick={()=>addMsgTasks(m)}
+                          style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:ACC,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+                          Add {m.tasks.length} task{m.tasks.length>1?"s":""}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{display:"flex",gap:10}}>
-                <button onClick={()=>{ setAiResult(null); setPending([]); }}
-                  style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(255,255,255,0.1)",color:T2,fontSize:16,fontWeight:600,cursor:"pointer"}}>Back</button>
-                <button onClick={addPending} disabled={!pending.some(p=>p.sel)}
-                  style={{flex:2,padding:"14px 0",borderRadius:14,border:"none",
-                    background:pending.some(p=>p.sel)?ACC:"rgba(255,255,255,0.08)",
-                    color:pending.some(p=>p.sel)?"#fff":T2,fontSize:16,fontWeight:700,cursor:"pointer"}}>
-                  Add {pending.filter(p=>p.sel).length} tasks
-                </button>
-              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Loading indicator inline in thread */}
+        {aiLoad&&(
+          <div style={{...gl(),borderRadius:16,padding:"20px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:16}}>
+            <div className="ai-spinner" style={{flexShrink:0,width:28,height:28,borderWidth:2}}/>
+            <div>
+              <div style={{fontSize:14,fontWeight:600,color:T1,marginBottom:2}}>Working on it…</div>
+              <div style={{fontSize:12,color:T2}}>Searching the web and building tasks</div>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Error */}
+        {aiErr&&(
+          <div style={{...gl(),borderRadius:16,padding:"14px 16px",marginBottom:16,border:`1px solid ${PINK}40`,background:`${PINK}12`}}>
+            <div style={{fontSize:13,fontWeight:700,color:PINK,marginBottom:4}}>Something went wrong</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,0.75)",lineHeight:1.5,marginBottom:10}}>{aiErr}</div>
+            <button onClick={()=>setAiErr("")} style={{fontSize:12,fontWeight:700,color:PINK,background:`${PINK}20`,border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer"}}>Dismiss</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Fixed input bar at bottom ── */}
+      <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#111116",borderTop:`1px solid ${BORD}`,padding:"12px 16px",paddingBottom:"calc(env(safe-area-inset-bottom) + 72px)"}}>
+        <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+          <textarea value={aiInput} onChange={e=>setAiInput(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); runAI(); } }}
+            placeholder={hasConvo?"Follow up…":aiMode==="brain"?"Type a goal, problem, brain dump…":"Paste email here…"}
+            rows={1}
+            style={{...IS,flex:1,resize:"none",minHeight:44,maxHeight:120,padding:"11px 14px",fontSize:15,lineHeight:1.5,overflowY:"auto"}}/>
+          <button onClick={runAI} disabled={!aiInput.trim()||aiLoad}
+            style={{width:44,height:44,borderRadius:22,border:"none",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+              background:aiInput.trim()&&!aiLoad?ACC:"rgba(255,255,255,0.08)",
+              color:aiInput.trim()&&!aiLoad?"#fff":T2}}>↑</button>
         </div>
       </div>
+
       {sharedTab}
     </div>
-  );
+  );}
 
   // ══════════════════════════════════
   // NEW TASK
