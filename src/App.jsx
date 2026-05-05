@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 
 const ACC = "#6C5CE7";
 
@@ -56,6 +56,15 @@ const PRI = { high:{label:"Urgent",color:"#E84393"}, med:{label:"Normal",color:A
 const WEEK_DAYS = ["S","M","T","W","T","F","S"];
 const TODAY_LONG  = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
 const TODAY_SHORT = new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+const today       = new Date();
+
+const EC = [
+  {bg:"rgba(255,200,120,0.28)",border:"#F5A623"},
+  {bg:`${ACC}20`,border:ACC},
+  {bg:"rgba(100,220,200,0.25)",border:"#00B894"},
+  {bg:"rgba(232,67,147,0.18)",border:"#E84393"},
+  {bg:"rgba(100,180,255,0.22)",border:"#3D9EFF"},
+];
 
 const AI_SYS = `You are the AI brain of a personal life OS for Elias — Salesforce consultant who just relocated from Austin TX to Amsterdam. DAFT visa applicant, self-employed. Today: ${TODAY_LONG}.
 
@@ -104,7 +113,7 @@ function t2m(t){ if(!t) return null; const [h,m]=t.split(":").map(Number); retur
 function fmt(t){ if(!t) return ""; const [h,m]=t.split(":").map(Number); return `${h%12||12}:${String(m).padStart(2,"0")} ${h>=12?"PM":"AM"}`; }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 function load(key,fb){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fb; }catch{ return fb; } }
-function save(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch{} }
+function save(key,val){ try{ localStorage.setItem(key,JSON.stringify(val)); }catch(e){ void e; } }
 
 const gl = (op=0.78,bl=20) => ({
   background:`rgba(255,255,255,${op})`,
@@ -143,10 +152,10 @@ const IS = {
 };
 
 // ─────────────────────────────────────────
-// SUB-COMPONENTS (outside App to avoid remount)
+// SUB-COMPONENTS
 // ─────────────────────────────────────────
 
-function TabBar({ tab, setTab, setView }) {
+const TabBar = memo(function TabBar({ tab, setTab, setView }) {
   const items = [{id:"home",icon:"◉",label:"Areas"},{id:"schedule",icon:"◷",label:"Schedule"},{id:"ai",icon:"✦",label:"AI"}];
   return (
     <div style={TABBAR}>
@@ -159,9 +168,9 @@ function TabBar({ tab, setTab, setView }) {
       ))}
     </div>
   );
-}
+});
 
-function TaskRow({ t, areas, onToggle, onOpen, onToggleSub }) {
+const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
   const [expanded, setExpanded] = useState(false);
   const subs    = t.subtasks||[];
   const subDone = subs.filter(s=>s.done).length;
@@ -206,7 +215,6 @@ function TaskRow({ t, areas, onToggle, onOpen, onToggleSub }) {
           <span onClick={()=>onOpen(t.id)} style={{color:"#C7C7CC",fontSize:16,cursor:"pointer"}}>›</span>
         </div>
       </div>
-      {/* Subtask dropdown */}
       {hasSubs && expanded && !t.done && (
         <div style={{marginLeft:58,marginRight:18,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${ACC}20`,background:`${ACC}06`}}>
           {subs.map((s,i)=>(
@@ -233,9 +241,55 @@ function TaskRow({ t, areas, onToggle, onOpen, onToggleSub }) {
       )}
     </div>
   );
-}
+});
 
-function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onDelete, onSave, onClose }) {
+const Sheet = memo(function Sheet({ children, onClose, tall }) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",display:"flex",
+      alignItems:"flex-end",zIndex:200,backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:"rgba(245,245,250,0.97)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",
+        borderRadius:"20px 20px 0 0",padding:"12px 20px 44px",width:"100%",
+        boxSizing:"border-box",maxHeight:tall?"93vh":"auto",overflowY:"auto"}}>
+        <div style={{width:36,height:5,borderRadius:3,background:"#D1D1D6",margin:"0 auto 20px"}}/>
+        {children}
+      </div>
+    </div>
+  );
+});
+
+const Lbl = memo(function Lbl({ children }) {
+  return <div style={{fontSize:11,fontWeight:700,color:"#8E8E93",letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>{children}</div>;
+});
+
+const InfoCard = memo(function InfoCard({ color, label, text, bg, border }) {
+  return (
+    <div style={{background:bg,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${border}`}}>
+      <div style={{fontSize:11,fontWeight:700,color,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{label}</div>
+      <div style={{fontSize:14,lineHeight:1.5,color:"#3C3C43"}}>{text}</div>
+    </div>
+  );
+});
+
+const ConfirmDelete = memo(function ConfirmDelete({ name, onCancel, onConfirm }) {
+  return (
+    <Sheet onClose={onCancel}>
+      <div style={{textAlign:"center",padding:"8px 0 20px"}}>
+        <div style={{fontSize:40,marginBottom:12}}>⚠</div>
+        <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",marginBottom:8}}>Delete area?</div>
+        <div style={{fontSize:15,color:"#8E8E93",lineHeight:1.5,marginBottom:24}}>
+          All tasks in <strong style={{color:"#1C1C1E"}}>{name}</strong> will move to Inbox.
+        </div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={onCancel} style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(0,0,0,0.06)",color:"#8E8E93",fontSize:16,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button onClick={onConfirm} style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"#E84393",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Delete</button>
+        </div>
+      </div>
+    </Sheet>
+  );
+});
+
+const TaskDetailSheet = memo(function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onDelete, onSave, onClose }) {
   const [newSub, setNewSub] = useState("");
   if (!detailId || !editForm) return null;
 
@@ -287,7 +341,6 @@ function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onD
         placeholder="Links, references, anything…"
         style={{...IS,resize:"none",minHeight:52,marginBottom:16,lineHeight:1.5}}/>
 
-      {/* Subtasks */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
         <Lbl>Subtasks {subtasks.length>0?`(${subDone}/${subtasks.length})`:""}</Lbl>
       </div>
@@ -307,7 +360,6 @@ function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onD
           ))}
         </div>
       )}
-      {/* Add subtask */}
       <div style={{display:"flex",gap:8,marginBottom:20}}>
         <input value={newSub} onChange={e=>setNewSub(e.target.value)}
           onKeyDown={e=>e.key==="Enter"&&addSub()}
@@ -357,60 +409,52 @@ function TaskDetailSheet({ detailId, editForm, setEditForm, areas, onToggle, onD
       </button>
     </Sheet>
   );
-}
+});
 
-function Sheet({ children, onClose, tall }) {
+const AreaMgrSheet = memo(function AreaMgrSheet({ show, onClose, editingArea, areaForm, setAreaForm, onSave, onDeleteRequest }) {
+  if (!show) return null;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",display:"flex",
-      alignItems:"flex-end",zIndex:200,backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)"}}
-      onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:"rgba(245,245,250,0.97)",backdropFilter:"blur(30px)",WebkitBackdropFilter:"blur(30px)",
-        borderRadius:"20px 20px 0 0",padding:"12px 20px 44px",width:"100%",
-        boxSizing:"border-box",maxHeight:tall?"93vh":"auto",overflowY:"auto"}}>
-        <div style={{width:36,height:5,borderRadius:3,background:"#D1D1D6",margin:"0 auto 20px"}}/>
-        {children}
+    <Sheet onClose={onClose} tall>
+      <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",marginBottom:20}}>{editingArea?"Edit area":"New area"}</div>
+      <Lbl>Icon</Lbl>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
+        {ICONS.map(ic=>(
+          <button key={ic} onClick={()=>setAreaForm(f=>({...f,icon:ic}))}
+            style={{width:40,height:40,borderRadius:12,border:`2px solid ${areaForm.icon===ic?ACC:"transparent"}`,
+              background:areaForm.icon===ic?`${ACC}15`:"rgba(255,255,255,0.7)",fontSize:18,cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center"}}>{ic}</button>
+        ))}
       </div>
-    </div>
-  );
-}
-
-function Lbl({ children }) {
-  return <div style={{fontSize:11,fontWeight:700,color:"#8E8E93",letterSpacing:1.2,textTransform:"uppercase",marginBottom:8}}>{children}</div>;
-}
-
-function InfoCard({ color, label, text, bg, border }) {
-  return (
-    <div style={{background:bg,borderRadius:16,padding:"14px 16px",marginBottom:12,border:`1px solid ${border}`}}>
-      <div style={{fontSize:11,fontWeight:700,color,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>{label}</div>
-      <div style={{fontSize:14,lineHeight:1.5,color:"#3C3C43"}}>{text}</div>
-    </div>
-  );
-}
-
-function ConfirmDelete({ name, onCancel, onConfirm }) {
-  return (
-    <Sheet onClose={onCancel}>
-      <div style={{textAlign:"center",padding:"8px 0 20px"}}>
-        <div style={{fontSize:40,marginBottom:12}}>⚠</div>
-        <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",marginBottom:8}}>Delete area?</div>
-        <div style={{fontSize:15,color:"#8E8E93",lineHeight:1.5,marginBottom:24}}>
-          All tasks in <strong style={{color:"#1C1C1E"}}>{name}</strong> will move to Inbox.
-        </div>
-        <div style={{display:"flex",gap:10}}>
-          <button onClick={onCancel} style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(0,0,0,0.06)",color:"#8E8E93",fontSize:16,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-          <button onClick={onConfirm} style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"#E84393",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Delete</button>
-        </div>
+      <Lbl>Name</Lbl>
+      <input placeholder="e.g. Golf, Travel…" value={areaForm.label}
+        onChange={e=>setAreaForm(f=>({...f,label:e.target.value}))} style={{...IS,marginBottom:12}}/>
+      <Lbl>Description</Lbl>
+      <input placeholder="Short tagline" value={areaForm.sub}
+        onChange={e=>setAreaForm(f=>({...f,sub:e.target.value}))} style={{...IS,marginBottom:24}}/>
+      <div style={{display:"flex",gap:10}}>
+        {editingArea&&editingArea.id!=="inbox"&&(
+          <button onClick={onDeleteRequest}
+            style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(232,67,147,0.1)",color:"#E84393",fontSize:15,fontWeight:700,cursor:"pointer"}}>Delete</button>
+        )}
+        <button onClick={onClose}
+          style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(0,0,0,0.06)",color:"#8E8E93",fontSize:15,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+        <button onClick={onSave} disabled={!areaForm.label.trim()}
+          style={{flex:2,padding:"14px 0",borderRadius:14,border:"none",
+            background:areaForm.label.trim()?ACC:"rgba(0,0,0,0.06)",
+            color:areaForm.label.trim()?"#fff":"#8E8E93",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+          {editingArea?"Save":"Create area"}
+        </button>
       </div>
     </Sheet>
   );
-}
+});
 
 // ─────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────
 export default function App() {
   const [areas,  setAreas]  = useState(()=>load("los_areas",  DEFAULT_AREAS));
-  const [tasks,  setTasks]  = useState(()=>load("los_tasks",  DEFAULT_TASKS));
+  const [tasks,  setTasks]  = useState(()=>load("los_tasks",  DEFAULT_TASKS).map(t=>({subtasks:[],...t})));
   const [view,   setView]   = useState("home");
   const [tab,    setTab]    = useState("home");
   const [activeArea,  setActiveArea]  = useState(null);
@@ -430,94 +474,118 @@ export default function App() {
   const [aiErr,    setAiErr]    = useState("");
   const [pending,  setPending]  = useState([]);
 
-  // migrate old tasks that lack subtasks field
-  useEffect(()=>{
-    setTasks(ts=>ts.map(t=>({subtasks:[],...t})));
-  },[]);
+  // Refs for reading latest state inside stable callbacks
+  const tasksRef      = useRef(tasks);
+  const editFormRef   = useRef(editForm);
+  const activeAreaRef = useRef(activeArea);
+  const newTRef       = useRef(newT);
+  useEffect(()=>{ tasksRef.current    = tasks;      },[tasks]);
+  useEffect(()=>{ editFormRef.current = editForm;   },[editForm]);
+  useEffect(()=>{ activeAreaRef.current = activeArea; },[activeArea]);
+  useEffect(()=>{ newTRef.current     = newT;       },[newT]);
+
   useEffect(()=>save("los_areas",areas),[areas]);
   useEffect(()=>save("los_tasks",tasks),[tasks]);
 
-  function toggle(id){ setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)); }
-  function delTask(id){ setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null); }
-  function toggleSub(taskId, subId){
+  // ── Stable callbacks (no deps needed due to refs / functional updates) ──
+  const toggle    = useCallback((id)=>{ setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)); },[]);
+  const delTask   = useCallback((id)=>{ setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null); },[]);
+  const toggleSub = useCallback((taskId,subId)=>{
     setTasks(ts=>ts.map(t=>t.id===taskId
-      ? {...t, subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,done:!s.done}:s)}
-      : t
-    ));
-  }
+      ?{...t,subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,done:!s.done}:s)}
+      :t));
+  },[]);
 
-  function openDetail(id){
-    const t=tasks.find(x=>x.id===id);
+  const openDetail  = useCallback((id)=>{
+    const t=tasksRef.current.find(x=>x.id===id);
     if(!t) return;
     setEditForm({...t});
     setDetailId(id);
-  }
-  function saveDetail(){
-    setTasks(ts=>ts.map(t=>t.id===detailId?{...editForm}:t));
+  },[]);
+
+  const saveDetail  = useCallback(()=>{
+    const f=editFormRef.current;
+    setTasks(ts=>ts.map(t=>t.id===f.id?{...f}:t));
     setDetailId(null); setEditForm(null);
-  }
-  function closeDetail(){ setDetailId(null); setEditForm(null); }
+  },[]);
 
-  function addManual(){
-    if(!newT.text.trim()) return;
-    setTasks(ts=>[...ts,{...newT,id:uid(),done:false,subtasks:[]}]);
-    setNewT({text:"",area:activeArea||"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
-    setView(activeArea?"area":"home");
-  }
+  const closeDetail = useCallback(()=>{ setDetailId(null); setEditForm(null); },[]);
 
-  function openNewArea(){ setEditingArea(null); setAreaForm({label:"",sub:"",icon:"⊙"}); setShowAreaMgr(true); }
-  function openEditArea(a){ setEditingArea(a); setAreaForm({label:a.label,sub:a.sub,icon:a.icon}); setShowAreaMgr(true); }
-  function saveArea(){
-    if(!areaForm.label.trim()) return;
-    if(editingArea){
-      setAreas(as=>as.map(a=>a.id===editingArea.id?{...a,...areaForm}:a));
-    } else {
-      const id=areaForm.label.toLowerCase().replace(/\s+/g,"-")+"-"+uid().slice(0,4);
-      setAreas(as=>[...as,{id,label:areaForm.label,sub:areaForm.sub||areaForm.label,icon:areaForm.icon}]);
-    }
+  const addManual   = useCallback(()=>{
+    const n=newTRef.current;
+    if(!n.text.trim()) return;
+    setTasks(ts=>[...ts,{...n,id:uid(),done:false,subtasks:[]}]);
+    const aa=activeAreaRef.current;
+    setNewT({text:"",area:aa||"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:""});
+    setView(aa?"area":"home");
+  },[]);
+
+  const openNewArea  = useCallback(()=>{ setEditingArea(null); setAreaForm({label:"",sub:"",icon:"⊙"}); setShowAreaMgr(true); },[]);
+  const openEditArea = useCallback((a)=>{ setEditingArea(a); setAreaForm({label:a.label,sub:a.sub,icon:a.icon}); setShowAreaMgr(true); },[]);
+  const closeAreaMgr = useCallback(()=>setShowAreaMgr(false),[]);
+
+  const saveArea = useCallback(()=>{
+    setAreaForm(f=>{
+      if(!f.label.trim()) return f;
+      setEditingArea(ea=>{
+        if(ea){
+          setAreas(as=>as.map(a=>a.id===ea.id?{...a,...f}:a));
+        } else {
+          const id=f.label.toLowerCase().replace(/\s+/g,"-")+"-"+uid().slice(0,4);
+          setAreas(as=>[...as,{id,label:f.label,sub:f.sub||f.label,icon:f.icon}]);
+        }
+        return ea;
+      });
+      setShowAreaMgr(false);
+      return f;
+    });
+  },[]);
+
+  const areaDeleteRequest = useCallback(()=>{
+    setEditingArea(ea=>{ setConfirmDel(ea?.id); return ea; });
     setShowAreaMgr(false);
-  }
-  function deleteArea(id){
+  },[]);
+
+  const deleteArea = useCallback((id)=>{
     setTasks(ts=>ts.map(t=>t.area===id?{...t,area:"inbox"}:t));
     setAreas(as=>as.filter(a=>a.id!==id));
     setConfirmDel(null);
-    if(activeArea===id){ setActiveArea(null); setView("home"); }
-  }
+    setActiveArea(aa=>{ if(aa===id){ setView("home"); return null; } return aa; });
+  },[]);
 
-  async function runAI(){
-    if(!aiInput.trim()) return;
+  const runAI = useCallback(async()=>{
+    const input=aiInput; const mode=aiMode;
+    if(!input.trim()) return;
     setAiLoad(true); setAiErr(""); setAiResult(null); setPending([]);
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",headers:{"Content-Type":"application/json"},
+        method:"POST",headers:{
+          "Content-Type":"application/json",
+          "x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,
+          "anthropic-version":"2023-06-01",
+          "anthropic-dangerous-direct-browser-access":"true",
+        },
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:2000,
           system:AI_SYS,
-          tools:[{ type:"web_search_20250305", name:"web_search" }],
-          messages:[{role:"user",content:aiMode==="email"
-            ? `Extract all actions from this email and build tasks with subtasks:\n\n${aiInput}`
-            : `${aiInput}\n\nResearch this thoroughly using web search if needed. Build me tasks with detailed subtasks I can act on immediately.`
+          tools:[{type:"web_search_20250305",name:"web_search"}],
+          messages:[{role:"user",content:mode==="email"
+            ?`Extract all actions from this email and build tasks with subtasks:\n\n${input}`
+            :`${input}\n\nResearch this thoroughly using web search if needed. Build me tasks with detailed subtasks I can act on immediately.`
           }]
         })
       });
       const d=await res.json();
-      // extract the final text block (after any tool use)
-      const textBlock = d.content?.filter(b=>b.type==="text").pop();
-      const raw = textBlock?.text||"";
-      const cleaned = raw.replace(/```json|```/g,"").trim();
-      // find JSON object in response
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      const textBlock=d.content?.filter(b=>b.type==="text").pop();
+      const raw=textBlock?.text||"";
+      const cleaned=raw.replace(/```json|```/g,"").trim();
+      const jsonMatch=cleaned.match(/\{[\s\S]*\}/);
       if(!jsonMatch) throw new Error("No JSON found");
       const parsed=JSON.parse(jsonMatch[0]);
       setAiResult(parsed);
-      setPending((parsed.tasks||[]).map((t)=>({
-        ...t,
-        id:uid(),
-        done:false,
-        desc:t.notes||"",
-        notes:"",
-        sel:true,
+      setPending((parsed.tasks||[]).map(t=>({
+        ...t,id:uid(),done:false,desc:t.notes||"",notes:"",sel:true,
         subtasks:(t.subtasks||[]).map(s=>({id:uid(),text:s.text||s,done:false}))
       })));
     }catch(e){
@@ -525,72 +593,38 @@ export default function App() {
       console.error(e);
     }
     setAiLoad(false);
-  }
+  },[aiInput,aiMode]);
 
-  function addPending(){
-    setTasks(ts=>[...ts,...pending.filter(p=>p.sel).map(({sel,...t})=>t)]);
-    setView("home"); setTab("home"); setAiResult(null); setAiInput(""); setPending([]);
-  }
+  const addPending = useCallback(()=>{
+    setPending(ps=>{
+      setTasks(ts=>[...ts,...ps.filter(p=>p.sel).map(p=>{ const {sel,...t}=p; void sel; return t; })]);
+      return [];
+    });
+    setView("home"); setTab("home"); setAiResult(null); setAiInput("");
+  },[]);
 
-  const urgent    = tasks.filter(t=>t.priority==="high"&&!t.done);
-  const doneList  = tasks.filter(t=>t.done);
-  const scheduled = [...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time));
-  const today     = new Date();
-  const weekDates = Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()-today.getDay()+i); return d; });
+  // ── Derived data (memoized) ──
+  const urgent    = useMemo(()=>tasks.filter(t=>t.priority==="high"&&!t.done),[tasks]);
+  const doneList  = useMemo(()=>tasks.filter(t=>t.done),[tasks]);
+  const scheduled = useMemo(()=>[...tasks].filter(t=>t.time&&!t.done).sort((a,b)=>t2m(a.time)-t2m(b.time)),[tasks]);
+  const weekDates = useMemo(()=>Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(today.getDate()-today.getDay()+i); return d; }),[]);
 
-  const EC=[
-    {bg:"rgba(255,200,120,0.28)",border:"#F5A623"},
-    {bg:`${ACC}20`,border:ACC},
-    {bg:"rgba(100,220,200,0.25)",border:"#00B894"},
-    {bg:"rgba(232,67,147,0.18)",border:"#E84393"},
-    {bg:"rgba(100,180,255,0.22)",border:"#3D9EFF"},
-  ];
+  // ── Stable detail callbacks (only change when detailId changes) ──
+  const detailToggle = useCallback(()=>{ toggle(detailId); closeDetail(); },[detailId,toggle,closeDetail]);
+  const detailDelete = useCallback(()=>delTask(detailId),[detailId,delTask]);
 
   const sharedDetail = (
     <TaskDetailSheet
       detailId={detailId} editForm={editForm} setEditForm={setEditForm} areas={areas}
-      onToggle={()=>{ toggle(detailId); closeDetail(); }}
-      onDelete={()=>delTask(detailId)}
-      onSave={saveDetail} onClose={closeDetail}
+      onToggle={detailToggle} onDelete={detailDelete} onSave={saveDetail} onClose={closeDetail}
     />
   );
-
   const sharedTab = <TabBar tab={tab} setTab={setTab} setView={setView}/>;
-
-  // ── AREA MANAGER SHEET ──
-  const AreaMgrSheet = () => !showAreaMgr ? null : (
-    <Sheet onClose={()=>setShowAreaMgr(false)} tall>
-      <div style={{fontSize:20,fontWeight:800,color:"#1C1C1E",marginBottom:20}}>{editingArea?"Edit area":"New area"}</div>
-      <Lbl>Icon</Lbl>
-      <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}>
-        {ICONS.map(ic=>(
-          <button key={ic} onClick={()=>setAreaForm(f=>({...f,icon:ic}))}
-            style={{width:40,height:40,borderRadius:12,border:`2px solid ${areaForm.icon===ic?ACC:"transparent"}`,
-              background:areaForm.icon===ic?`${ACC}15`:"rgba(255,255,255,0.7)",fontSize:18,cursor:"pointer",
-              display:"flex",alignItems:"center",justifyContent:"center"}}>{ic}</button>
-        ))}
-      </div>
-      <Lbl>Name</Lbl>
-      <input placeholder="e.g. Golf, Travel…" value={areaForm.label}
-        onChange={e=>setAreaForm(f=>({...f,label:e.target.value}))} style={{...IS,marginBottom:12}}/>
-      <Lbl>Description</Lbl>
-      <input placeholder="Short tagline" value={areaForm.sub}
-        onChange={e=>setAreaForm(f=>({...f,sub:e.target.value}))} style={{...IS,marginBottom:24}}/>
-      <div style={{display:"flex",gap:10}}>
-        {editingArea&&editingArea.id!=="inbox"&&(
-          <button onClick={()=>{setShowAreaMgr(false);setConfirmDel(editingArea.id);}}
-            style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(232,67,147,0.1)",color:"#E84393",fontSize:15,fontWeight:700,cursor:"pointer"}}>Delete</button>
-        )}
-        <button onClick={()=>setShowAreaMgr(false)}
-          style={{flex:1,padding:"14px 0",borderRadius:14,border:"none",background:"rgba(0,0,0,0.06)",color:"#8E8E93",fontSize:15,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-        <button onClick={saveArea} disabled={!areaForm.label.trim()}
-          style={{flex:2,padding:"14px 0",borderRadius:14,border:"none",
-            background:areaForm.label.trim()?ACC:"rgba(0,0,0,0.06)",
-            color:areaForm.label.trim()?"#fff":"#8E8E93",fontSize:15,fontWeight:700,cursor:"pointer"}}>
-          {editingArea?"Save":"Create area"}
-        </button>
-      </div>
-    </Sheet>
+  const sharedAreaMgr = (
+    <AreaMgrSheet
+      show={showAreaMgr} onClose={closeAreaMgr} editingArea={editingArea}
+      areaForm={areaForm} setAreaForm={setAreaForm} onSave={saveArea} onDeleteRequest={areaDeleteRequest}
+    />
   );
 
   // ══════════════════════════════════
@@ -659,7 +693,7 @@ export default function App() {
       </div>
       {sharedTab}
       {sharedDetail}
-      <AreaMgrSheet/>
+      {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
     </div>
   );
@@ -698,7 +732,7 @@ export default function App() {
               <div style={{...gl(0.8),borderRadius:20,overflow:"hidden",marginBottom:10}}>
                 {open.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
+                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
                     {i<open.length-1 && <div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
@@ -718,7 +752,7 @@ export default function App() {
                 </button>
                 {showDone && done.map((t,i)=>(
                   <div key={t.id}>
-                    <TaskRow t={t} areas={areas} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
+                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
                     {i<done.length-1 && <div style={{height:1,background:"rgba(0,0,0,0.05)",marginLeft:58}}/>}
                   </div>
                 ))}
@@ -737,7 +771,7 @@ export default function App() {
         </div>
         {sharedTab}
         {sharedDetail}
-        <AreaMgrSheet/>
+        {sharedAreaMgr}
         {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
       </div>
     );
