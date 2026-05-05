@@ -309,6 +309,7 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
             {t.time && !t.done && <span style={{fontSize:11,color:T2}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</span>}
             {t.priority==="high" && !t.done && <span style={{fontSize:11,fontWeight:700,color:PINK}}>Urgent</span>}
             {t.due && !t.done && <span style={{fontSize:11,color:T2}}>Due {t.due}</span>}
+            {t.recurring && !t.done && <span style={{display:"flex",color:GOLD,lineHeight:1}}>{Icon.recurring()}</span>}
           </div>
           {hasSubs && !t.done && (
             <div style={{marginTop:6,height:2,borderRadius:1,background:"rgba(255,255,255,0.1)"}}>
@@ -1115,7 +1116,17 @@ export default function App() {
    
   },[tasks,isSignedIn,syncEnabled]);
 
-  const toggle    = useCallback((id)=>{ setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t)); },[]);
+  const toggle    = useCallback((id)=>{
+    setTasks(ts=>{
+      const updated=ts.map(t=>t.id===id?{...t,done:!t.done}:t);
+      const task=updated.find(t=>t.id===id);
+      // If recurring and just marked done, reset after 2s
+      if(task?.done&&task?.recurring){
+        setTimeout(()=>setTasks(ts2=>ts2.map(t=>t.id===id?{...t,done:false,subtasks:(t.subtasks||[]).map(s=>({...s,done:false}))}:t)),2000);
+      }
+      return updated;
+    });
+  },[]);
   const delTask   = useCallback((id)=>{
     setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null);
     getTokenRef.current().then(token=>fetch(`/api/tasks?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}));
@@ -1541,10 +1552,15 @@ export default function App() {
             style={{...IS,fontSize:17,fontWeight:700,marginBottom:12}}/>
 
           {/* Meta */}
-          <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:14}}>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:14}}>
             {td.due&&<span style={{fontSize:11,color:T2}}>Due {td.due}</span>}
             {td.time&&<span style={{fontSize:11,color:T2}}>{fmt(td.time)}{td.dur?` · ${td.dur}m`:""}</span>}
-            <span style={{display:"flex",color:T2}}>{Icon.recurring()}</span>
+            {td.recurring&&(
+              <span style={{display:"flex",alignItems:"center",gap:4,fontSize:11,color:GOLD}}>
+                <span style={{display:"flex"}}>{Icon.recurring()}</span>
+                {td.recurring.charAt(0).toUpperCase()+td.recurring.slice(1)}
+              </span>
+            )}
           </div>
 
           {/* Tag pills */}
@@ -1603,11 +1619,63 @@ export default function App() {
             </div>
           </div>
 
-          {/* Description */}
+          {/* Description + Notes */}
           <Lbl>Description</Lbl>
           <textarea value={td.desc||""} onChange={e=>setEditForm(f=>({...f,desc:e.target.value}))}
             placeholder="Add more context…"
             style={{...IS,resize:"none",minHeight:60,marginBottom:12,lineHeight:1.5}}/>
+          <Lbl>Notes</Lbl>
+          <textarea value={td.notes||""} onChange={e=>setEditForm(f=>({...f,notes:e.target.value}))}
+            placeholder="Links, references…"
+            style={{...IS,resize:"none",minHeight:48,marginBottom:16,lineHeight:1.5}}/>
+
+          {/* Area + Priority */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div>
+              <Lbl>Area</Lbl>
+              <select value={td.area||"inbox"} onChange={e=>setEditForm(f=>({...f,area:e.target.value}))} style={IS}>
+                {areas.map(a=><option key={a.id} value={a.id}>{a.icon} {a.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Lbl>Priority</Lbl>
+              <select value={td.priority||"med"} onChange={e=>setEditForm(f=>({...f,priority:e.target.value}))} style={IS}>
+                <option value="high">Urgent</option>
+                <option value="med">Normal</option>
+                <option value="low">Later</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Time + Duration */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+            <div>
+              <Lbl>Time</Lbl>
+              <input type="time" value={td.time||""} onChange={e=>setEditForm(f=>({...f,time:e.target.value}))} style={IS}/>
+            </div>
+            <div>
+              <Lbl>Duration (min)</Lbl>
+              <input type="number" value={td.dur||""} onChange={e=>setEditForm(f=>({...f,dur:+e.target.value}))} style={IS}/>
+            </div>
+          </div>
+
+          {/* Due date */}
+          <Lbl>Due date</Lbl>
+          <input type="date" value={td.due||""} onChange={e=>setEditForm(f=>({...f,due:e.target.value}))}
+            style={{...IS,marginBottom:16}}/>
+
+          {/* Recurring */}
+          <Lbl>Repeats</Lbl>
+          <div style={{...gl(),borderRadius:12,padding:4,display:"flex",marginBottom:20}}>
+            {[{v:null,l:"Never"},{v:"daily",l:"Daily"},{v:"weekly",l:"Weekly"},{v:"monthly",l:"Monthly"}].map(opt=>(
+              <button key={String(opt.v)} onClick={()=>setEditForm(f=>({...f,recurring:opt.v}))}
+                style={{flex:1,padding:"8px 4px",borderRadius:9,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+                  background:(td.recurring||null)===opt.v?ACC:"transparent",
+                  color:(td.recurring||null)===opt.v?"#fff":T2}}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
 
           {/* Action buttons */}
           <div style={{display:"flex",gap:10,marginBottom:12}}>
