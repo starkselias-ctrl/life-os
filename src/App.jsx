@@ -758,10 +758,10 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
       const data = await res.json();
       const tasks = (data.tasks||[]).map(t=>({
         id: uid(),
-        text: typeof t === "string" ? t : t.text,
+        text: stripTags(typeof t === "string" ? t : t.text),
         area:"inbox", done:false, priority:"med",
         due:"", time:"", dur:30, desc:"", notes:"",
-        subtasks: (t.subtasks||[]).map(s=>({id:uid(),text:s.text,done:false})),
+        subtasks: (t.subtasks||[]).map(s=>({id:uid(),text:stripTags(s.text),done:false})),
       }));
       const aiIdx = messages.length + 1;
       setMessages(prev=>[...prev,{role:"ai",text:"",tasks}]);
@@ -842,7 +842,7 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
                           {t.subtasks.map((s,sIdx)=>(
                             <div key={sIdx} style={{display:"flex",alignItems:"flex-start",gap:6,marginBottom:4}}>
                               <div style={{width:3,height:3,borderRadius:2,background:T2,flexShrink:0,marginTop:5}}/>
-                              <span style={{fontSize:11,color:T2,lineHeight:1.4}}>{s.text}</span>
+                              <span style={{fontSize:11,color:T2,lineHeight:1.4}}>{stripTags(s.text)}</span>
                             </div>
                           ))}
                         </div>

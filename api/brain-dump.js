@@ -50,6 +50,7 @@ Example for "get my dog ready to move to Europe":
 
 Return ONLY a valid JSON array of task objects. Each object has "text" and "subtasks" (array of {text}).
 Multiple independent goals = multiple parent tasks. One goal = one parent task with all steps as subtasks.
+All text must be plain readable sentences — NO citation tags, NO HTML, NO markdown, NO <cite> tags.
 Return ONLY the JSON array, nothing else.`,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{ role: "user", content: prompt }],
