@@ -13,12 +13,7 @@ export async function requireAuth(req, res) {
     return null;
   }
   try {
-    const payload = await clerk.verifyToken(token, {
-      authorizedParties: [
-        "https://life-os-livid.vercel.app",
-        /^https:\/\/life-os[a-z0-9-]*\.vercel\.app$/,
-      ]
-    });
+    const payload = await clerk.verifyToken(token);
     return payload.sub; // Clerk user ID
   } catch {
     res.status(401).json({ error: "Invalid token" });
