@@ -1162,6 +1162,7 @@ export default function App() {
   const [showDone,     setShowDone]    = useState(false);
   const [expandedArea, setExpandedArea] = useState(null);
   const [expandedTask, setExpandedTask] = useState(null);
+  const [selected,     setSelected]     = useState(new Set());
   const [detailId,    setDetailId]    = useState(null);
   const [editForm,    setEditForm]    = useState(null);
   const [newT,        setNewT]        = useState({text:"",area:"inbox",priority:"med",due:"",time:"",dur:30,desc:"",notes:"",subtasks:[]});
@@ -1296,9 +1297,17 @@ export default function App() {
     });
   },[]);
   const delTask   = useCallback((id)=>{
-    setTasks(ts=>ts.filter(t=>t.id!==id)); setDetailId(null); setEditForm(null);
+    setTasks(ts=>ts.filter(t=>t.id!==id));
+    setDetailId(null); setEditForm(null); setExpandedTask(null);
+    setSelected(s=>{ const n=new Set(s); n.delete(id); return n; });
     getTokenRef.current().then(token=>fetch(`/api/tasks?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}));
   },[]);
+  const delSelected = useCallback(()=>{
+    const ids=[...selected];
+    setTasks(ts=>ts.filter(t=>!ids.includes(t.id)));
+    setSelected(new Set());
+    ids.forEach(id=>getTokenRef.current().then(token=>fetch(`/api/tasks?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}})));
+  },[selected]);
   const toggleSub = useCallback((taskId,subId)=>{
     setTasks(ts=>ts.map(t=>t.id===taskId
       ?{...t,subtasks:(t.subtasks||[]).map(s=>s.id===subId?{...s,done:!s.done}:s)}
@@ -1517,10 +1526,11 @@ export default function App() {
             </div>
             {todayTasks.length>0 ? todayTasks.map((t,i)=>{
               const a=getArea(areas,t.area);
+              const isSel=selected.has(t.id);
               return (
-                <div key={t.id} style={{opacity:t.done?0.45:1}}>
+                <div key={t.id} style={{opacity:t.done?0.45:1,background:isSel?"rgba(91,143,255,0.1)":"transparent"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10,
-                    padding:"9px 16px",background:i%2===0?SURF:"transparent",
+                    padding:"9px 16px",background:i%2===0&&!isSel?SURF:"transparent",
                     borderRadius:i===0?"0":"none"}}>
                     {/* SVG circle checkbox */}
                     <button onClick={()=>toggle(t.id)}
@@ -1544,6 +1554,12 @@ export default function App() {
                       <span style={{fontSize:9,fontWeight:600,padding:"2px 7px",borderRadius:999,
                         background:"#0D1A35",color:ACC,flexShrink:0}}>{fmt(t.time)}</span>
                     )}
+                    {/* Select button */}
+                    <button onClick={()=>setSelected(s=>{ const n=new Set(s); isSel?n.delete(t.id):n.add(t.id); return n; })}
+                      style={{background:isSel?ACC:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,
+                        width:20,height:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      {isSel&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
+                    </button>
                   </div>
                   {i<todayTasks.length-1&&<div style={{height:1,background:BORD,marginLeft:44}}/>}
                 </div>
@@ -1607,6 +1623,13 @@ export default function App() {
                             )}
                             <span onClick={e=>{ e.stopPropagation(); openDetail(t.id); }}
                               style={{fontSize:13,color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:"2px 4px"}}>⋯</span>
+                            {(()=>{ const isSel=selected.has(t.id); return (
+                              <button onClick={e=>{ e.stopPropagation(); setSelected(s=>{ const n=new Set(s); isSel?n.delete(t.id):n.add(t.id); return n; }); }}
+                                style={{background:isSel?ACC:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,
+                                  width:20,height:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                {isSel&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
+                              </button>
+                            ); })()}
                           </div>
                         </div>
                         {/* Subtasks */}
@@ -1659,10 +1682,7 @@ export default function App() {
                   </div>
                   <div>
                     <div style={{fontSize:12,fontWeight:600,color:T2,marginBottom:4}}>{a.label}</div>
-                    <div style={{fontSize:32,fontWeight:800,color:th.accent,lineHeight:1,marginBottom:10}}>{openC}</div>
-                    <div style={{height:2,borderRadius:2,background:BORD}}>
-                      <div style={{height:2,borderRadius:2,background:th.accent,width:`${pct}%`,transition:"width 0.4s"}}/>
-                    </div>
+                    <div style={{fontSize:32,fontWeight:800,color:th.accent,lineHeight:1}}>{openC}</div>
                   </div>
                 </div>
               );
@@ -1676,6 +1696,22 @@ export default function App() {
         </div>
       </div>
       {sharedTab}
+      {selected.size>0&&(
+        <div style={{position:"fixed",bottom:70,left:"50%",transform:"translateX(-50%)",
+          display:"flex",alignItems:"center",gap:10,
+          background:"#1A0A0A",border:`1px solid ${RED}40`,borderRadius:12,
+          padding:"10px 16px",zIndex:200,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>
+          <span style={{fontSize:12,color:T1,fontWeight:600}}>{selected.size} selected</span>
+          <button onClick={()=>setSelected(new Set())}
+            style={{fontSize:11,color:T2,background:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer"}}>
+            Cancel
+          </button>
+          <button onClick={delSelected}
+            style={{fontSize:11,color:"#fff",background:RED,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:600}}>
+            Delete {selected.size}
+          </button>
+        </div>
+      )}
       {sharedAreaMgr}
       {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
       {showProfile && !showChangePw && (
