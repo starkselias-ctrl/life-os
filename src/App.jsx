@@ -1064,8 +1064,8 @@ function SubtaskModal({ initial, onAdd, onClose }) {
 // MAIN APP
 // ─────────────────────────────────────────
 export default function App() {
-  const [areas,  setAreas]  = useState(()=>load("los_areas",  DEFAULT_AREAS));
-  const [tasks,  setTasks]  = useState(()=>load("los_tasks",  DEFAULT_TASKS).map(t=>({subtasks:[],...t})));
+  const [areas,  setAreas]  = useState(DEFAULT_AREAS);
+  const [tasks,  setTasks]  = useState([]);
   const [view,   setView]   = useState("home");
   const [tab,    setTab]    = useState("home");
   const [activeArea,   setActiveArea]  = useState(null);
@@ -1128,10 +1128,6 @@ export default function App() {
   useEffect(()=>{ messagesRef.current   = messages; },[messages]);
   useEffect(()=>{ getTokenRef.current   = getToken; },[getToken]);
 
-  // ── Persist to localStorage (offline cache) ──
-  useEffect(()=>save("los_areas",areas),[areas]);
-  useEffect(()=>save("los_tasks",tasks),[tasks]);
-
   // ── Load data from Neon on sign-in ──
   async function authFetch(url, opts={}){
     const token=await getTokenRef.current();
@@ -1140,29 +1136,17 @@ export default function App() {
 
   useEffect(()=>{
     if(!isSignedIn||!userId) return;
-    const lastId=localStorage.getItem("los_userid");
-    const switched=lastId&&lastId!==userId;
-    if(switched){
-      localStorage.removeItem("los_areas");
-      localStorage.removeItem("los_tasks");
-    }
-    localStorage.setItem("los_userid",userId);
     Promise.all([authFetch("/api/areas"),authFetch("/api/tasks")])
       .then(async([ar,tr])=>{
         if(!ar.ok) { console.error("areas load failed:",ar.status,await ar.text()); }
         if(!tr.ok) { console.error("tasks load failed:",tr.status,await tr.text()); }
         const aData = ar.ok ? await ar.json().catch(()=>[]) : [];
         const tData = tr.ok ? await tr.json().catch(()=>[]) : [];
-        if(switched){
-          setAreas(aData?.length ? aData : DEFAULT_AREAS);
-          setTasks(tData?.length ? tData.map(t=>({subtasks:[],...t})) : []);
-        } else {
-          if(aData?.length) setAreas(aData);
-          if(tData?.length) setTasks(tData.map(t=>({subtasks:[],...t})));
-        }
+        setAreas(aData?.length ? aData : DEFAULT_AREAS);
+        setTasks(tData.map(t=>({subtasks:[],...t})));
       })
       .catch(e=>console.error("Data load network error:",e))
-      .finally(()=>setSyncEnabled(true)); // always enable sync even on error
+      .finally(()=>setSyncEnabled(true));
   },[isSignedIn,userId]);
 
   // ── Focus timer interval ──
