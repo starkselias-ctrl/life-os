@@ -809,7 +809,7 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken }) {
             background:text.trim()&&!loading?ACC:"rgba(255,255,255,0.06)",
             color:text.trim()&&!loading?"#fff":T2,
             fontSize:13,fontWeight:600,cursor:"pointer"}}>
-          {loading?"Parsing…":"Parse tasks"}
+          {loading?"Building…":"Build tasks"}
         </button>
       )}
     </Sheet>
