@@ -284,7 +284,7 @@ const TabBar = memo(function TabBar({ tab, setTab, setView }) {
   );
 });
 
-const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
+const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub, selected, onSelect }) {
   const [expanded, setExpanded] = useState(false);
   const subs    = t.subtasks||[];
   const subDone = subs.filter(s=>s.done).length;
@@ -328,6 +328,13 @@ const TaskRow = memo(function TaskRow({ t, onToggle, onOpen, onToggleSub }) {
             </button>
           )}
           <span onClick={()=>onOpen(t.id)} style={{color:"rgba(255,255,255,0.2)",fontSize:16,cursor:"pointer"}}>›</span>
+          {onSelect&&(
+            <button onClick={e=>{e.stopPropagation();onSelect(t.id);}}
+              style={{background:selected?"#5B8FFF":"rgba(255,255,255,0.06)",border:"none",borderRadius:6,
+                width:20,height:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {selected&&<span style={{color:"#fff",fontSize:9}}>✓</span>}
+            </button>
+          )}
         </div>
       </div>
       {hasSubs && expanded && !t.done && (
@@ -1300,6 +1307,7 @@ export default function App() {
     setTasks(ts=>ts.filter(t=>t.id!==id));
     setDetailId(null); setEditForm(null); setExpandedTask(null);
     setSelected(s=>{ const n=new Set(s); n.delete(id); return n; });
+    setView(prevViewRef.current||"home");
     getTokenRef.current().then(token=>fetch(`/api/tasks?id=${id}`,{method:"DELETE",headers:{Authorization:`Bearer ${token}`}}));
   },[]);
   const delSelected = useCallback(()=>{
@@ -2073,8 +2081,10 @@ export default function App() {
             {open.length>0 ? (
               <div style={{...gl(),borderRadius:20,overflow:"hidden",marginBottom:10}}>
                 {open.map((t,i)=>(
-                  <div key={t.id}>
-                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
+                  <div key={t.id} style={{background:selected.has(t.id)?"rgba(91,143,255,0.08)":"transparent"}}>
+                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}
+                      selected={selected.has(t.id)}
+                      onSelect={id=>setSelected(s=>{ const n=new Set(s); s.has(id)?n.delete(id):n.add(id); return n; })}/>
                     {i<open.length-1 && <div style={{height:1,background:BORD,marginLeft:58}}/>}
                   </div>
                 ))}
@@ -2093,8 +2103,10 @@ export default function App() {
                   <span style={{fontSize:14,color:T2}}>{showDone?"▾":"▸"}</span>
                 </button>
                 {showDone && done.map((t,i)=>(
-                  <div key={t.id}>
-                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}/>
+                  <div key={t.id} style={{background:selected.has(t.id)?"rgba(91,143,255,0.08)":"transparent"}}>
+                    <TaskRow t={t} onToggle={toggle} onOpen={openDetail} onToggleSub={toggleSub}
+                      selected={selected.has(t.id)}
+                      onSelect={id=>setSelected(s=>{ const n=new Set(s); s.has(id)?n.delete(id):n.add(id); return n; })}/>
                     {i<done.length-1 && <div style={{height:1,background:BORD,marginLeft:58}}/>}
                   </div>
                 ))}
@@ -2112,7 +2124,23 @@ export default function App() {
           </div>
         </div>
         {sharedTab}
-          {sharedAreaMgr}
+        {selected.size>0&&(
+          <div style={{position:"fixed",bottom:70,left:"50%",transform:"translateX(-50%)",
+            display:"flex",alignItems:"center",gap:10,
+            background:"#1A0A0A",border:`1px solid ${RED}40`,borderRadius:12,
+            padding:"10px 16px",zIndex:200,boxShadow:"0 4px 20px rgba(0,0,0,0.5)"}}>
+            <span style={{fontSize:12,color:T1,fontWeight:600}}>{selected.size} selected</span>
+            <button onClick={()=>setSelected(new Set())}
+              style={{fontSize:11,color:T2,background:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer"}}>
+              Cancel
+            </button>
+            <button onClick={delSelected}
+              style={{fontSize:11,color:"#fff",background:RED,border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontWeight:600}}>
+              Delete {selected.size}
+            </button>
+          </div>
+        )}
+        {sharedAreaMgr}
         {confirmDel && <ConfirmDelete name={getArea(areas,confirmDel).label} onCancel={()=>setConfirmDel(null)} onConfirm={()=>deleteArea(confirmDel)}/>}
       </div>
     );
