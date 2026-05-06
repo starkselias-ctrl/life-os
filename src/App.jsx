@@ -748,9 +748,12 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
       });
       if(!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      const tasks = (data.tasks||[]).map((t,i)=>({
-        id: uid(), text: t, area:"inbox", done:false, priority:"med",
-        due:"", time:"", dur:30, desc:"", notes:"", subtasks:[],
+      const tasks = (data.tasks||[]).map(t=>({
+        id: uid(),
+        text: typeof t === "string" ? t : t.text,
+        area:"inbox", done:false, priority:"med",
+        due:"", time:"", dur:30, desc:"", notes:"",
+        subtasks: (t.subtasks||[]).map(s=>({id:uid(),text:s.text,done:false})),
       }));
       const aiIdx = messages.length + 1;
       setMessages(prev=>[...prev,{role:"ai",text:"",tasks}]);
@@ -824,8 +827,18 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
                       borderBottom:tIdx<msg.tasks.length-1?`0.5px solid ${BORD2}`:"none"}}>
                       <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
                         <div style={{width:5,height:5,borderRadius:3,background:ACC,flexShrink:0,marginTop:4}}/>
-                        <span style={{fontSize:12,color:T1,lineHeight:1.4}}>{t.text}</span>
+                        <span style={{fontSize:12,color:T1,lineHeight:1.4,fontWeight:600}}>{t.text}</span>
                       </div>
+                      {t.subtasks?.length>0&&(
+                        <div style={{paddingLeft:13,marginBottom:6}}>
+                          {t.subtasks.map((s,sIdx)=>(
+                            <div key={sIdx} style={{display:"flex",alignItems:"flex-start",gap:6,marginBottom:4}}>
+                              <div style={{width:3,height:3,borderRadius:2,background:T2,flexShrink:0,marginTop:5}}/>
+                              <span style={{fontSize:11,color:T2,lineHeight:1.4}}>{s.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div style={{display:"flex",gap:6,flexWrap:"wrap",paddingLeft:13}}>
                         {/* Area */}
                         <select value={meta.area}

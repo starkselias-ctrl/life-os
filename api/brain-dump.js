@@ -31,11 +31,25 @@ export default async function handler(req, res) {
   try {
     const r = await callClaude({
       model: MODEL,
-      max_tokens: 1024,
-      system: `You are a research assistant that turns brain dumps into actionable tasks.
-Use web search to research real locations, services, companies, prices, and logistics when the user needs them.
-After researching, return ONLY a valid JSON array of specific, actionable task strings. Max 8 tasks.
-Example: ["Book rabies vaccination at Austin Vet Specialists (512-555-0100)", "Get EU pet passport at USDA-accredited vet"]
+      max_tokens: 2048,
+      system: `You are a research assistant that turns brain dumps into structured tasks with subtasks.
+Use web search to find real locations, services, phone numbers, addresses, and steps when needed.
+
+Group everything into ONE parent task per goal with specific sequential subtasks underneath.
+Example for "get my dog ready to move to Europe":
+{
+  "text": "Get Luna move-ready for Europe",
+  "subtasks": [
+    { "text": "Book rabies vaccination at Austin Vet Clinic (512-555-0100) — 1234 Main St" },
+    { "text": "Get microchip implanted (ISO 11784/11785 standard required for EU)" },
+    { "text": "Obtain EU health certificate from USDA-accredited vet" },
+    { "text": "Endorse health certificate at USDA APHIS office" },
+    { "text": "Research pet import rules for destination country" }
+  ]
+}
+
+Return ONLY a valid JSON array of task objects. Each object has "text" and "subtasks" (array of {text}).
+Multiple independent goals = multiple parent tasks. One goal = one parent task with all steps as subtasks.
 Return ONLY the JSON array, nothing else.`,
       tools: [{ type: "web_search_20250305", name: "web_search" }],
       messages: [{ role: "user", content: prompt }],
@@ -49,7 +63,6 @@ Return ONLY the JSON array, nothing else.`,
 
     const d = await r.json();
 
-    // Find the final text block after any tool use
     const textBlock = d.content?.filter(b => b.type === "text").pop();
     const text = textBlock?.text || "[]";
     const match = text.match(/\[[\s\S]*\]/);
