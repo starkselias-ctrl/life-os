@@ -716,41 +716,76 @@ function LoginScreen() {
 // ─────────────────────────────────────────
 // BRAIN DUMP SHEET
 // ─────────────────────────────────────────
-function BrainDumpSheet({ onClose, onAddTasks, getToken }) {
-  const [text,    setText]    = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState(null);
-  const [err,     setErr]     = useState("");
+function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
+  const [text,     setText]     = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [err,      setErr]      = useState("");
+  const [messages, setMessages] = useState([]); // {role:"user"|"ai", text, tasks}
+  const [taskMeta, setTaskMeta] = useState({}); // {taskIdx: {area, due, time}}
+  const bottomRef = useRef(null);
+
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[messages,loading]);
 
   async function submit() {
-    if(!text.trim()) return;
-    setLoading(true); setErr(""); setResult(null);
+    if(!text.trim()||loading) return;
+    const userMsg = text.trim();
+    setText("");
+    setErr("");
+    setMessages(prev=>[...prev,{role:"user",text:userMsg}]);
+    setLoading(true);
     try {
       const token = await getToken();
+      // Build conversation history for context
+      const history = messages.map(m=>m.role==="user"
+        ? `User: ${m.text}`
+        : `Assistant tasks: ${(m.tasks||[]).map(t=>t.text).join(", ")}`
+      ).join("\n");
+      const prompt = history ? `${history}\nUser: ${userMsg}` : userMsg;
       const res = await fetch("/api/brain-dump",{
         method:"POST",
         headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
-        body:JSON.stringify({prompt:text}),
+        body:JSON.stringify({prompt}),
       });
       if(!res.ok) throw new Error(`Error ${res.status}`);
       const data = await res.json();
-      setResult(data.tasks||[]);
+      const tasks = (data.tasks||[]).map((t,i)=>({
+        id: uid(), text: t, area:"inbox", done:false, priority:"med",
+        due:"", time:"", dur:30, desc:"", notes:"", subtasks:[],
+      }));
+      const aiIdx = messages.length + 1;
+      setMessages(prev=>[...prev,{role:"ai",text:"",tasks}]);
+      // init meta for each task
+      const meta = {};
+      tasks.forEach((_,i)=>{ meta[`${aiIdx}_${i}`]={area:"inbox",due:"",time:""}; });
+      setTaskMeta(prev=>({...prev,...meta}));
     } catch(e) {
-      setErr("Could not parse tasks. Try again.");
+      setErr("Something went wrong. Try again.");
       console.error(e);
     }
     setLoading(false);
   }
 
+  function handleKey(e){ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); submit(); } }
+
   function addAll() {
-    onAddTasks(result||[]);
+    const allTasks = [];
+    messages.forEach((msg,mIdx)=>{
+      if(msg.role!=="ai") return;
+      (msg.tasks||[]).forEach((t,tIdx)=>{
+        const meta = taskMeta[`${mIdx}_${tIdx}`]||{};
+        allTasks.push({...t, area:meta.area||"inbox", due:meta.due||"", time:meta.time||""});
+      });
+    });
+    onAddTasks(allTasks);
     onClose();
   }
+
+  const hasTasks = messages.some(m=>m.role==="ai"&&m.tasks?.length);
 
   return (
     <Sheet onClose={onClose} tall noBlur>
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:18}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{background:"#1A0D35",border:`0.5px solid ${PURPLE}`,borderRadius:8,
           padding:"4px 8px",display:"inline-flex",alignItems:"center",gap:4}}>
           <span style={{color:PURPLE,lineHeight:1,display:"flex"}}>{Icon.spark(9)}</span>
@@ -759,57 +794,99 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken }) {
         <span style={{fontSize:12,fontWeight:700,color:T1}}>Brain dump</span>
       </div>
 
-      {/* Textarea */}
-      <textarea value={text} onChange={e=>setText(e.target.value)}
-        placeholder="Just type everything on your mind…"
-        style={{...IS,minHeight:80,resize:"none",lineHeight:1.6,
-          color:text?T1:"#4A4A70",marginBottom:12}}
-        onFocus={e=>e.target.style.borderColor=ACC}
-        onBlur={e=>e.target.style.borderColor=BORD2}/>
-
-      {/* Error */}
-      {err&&<div style={{fontSize:12,color:PINK,marginBottom:8}}>{err}</div>}
-
-      {/* Result card or submit button */}
-      {result ? (
-        <>
-          <div style={{background:"#0D1A35",border:`0.5px solid ${ACC}`,borderRadius:10,
-            padding:"10px 12px",marginBottom:12}}>
-            {loading ? (
-              <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
-                <div className="ai-spinner" style={{width:16,height:16,borderWidth:2}}/>
-                <span style={{fontSize:11,color:T2}}>Parsing your brain dump…</span>
-              </div>
-            ) : (
-              <>
-                <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:8}}>
-                  <span style={{color:ACC,display:"flex"}}>{Icon.spark(9)}</span>
-                  <span style={{fontSize:9,fontWeight:600,color:ACC}}>Tasks created</span>
+      {/* Conversation */}
+      <div style={{flex:1,overflowY:"auto",marginBottom:12,display:"flex",flexDirection:"column",gap:10}}>
+        {messages.length===0&&(
+          <div style={{fontSize:12,color:T2,textAlign:"center",marginTop:20}}>
+            Type anything — goals, tasks, problems. I'll research and build your tasks.
+          </div>
+        )}
+        {messages.map((msg,mIdx)=>(
+          <div key={mIdx}>
+            {msg.role==="user"?(
+              <div style={{display:"flex",justifyContent:"flex-end"}}>
+                <div style={{background:"#1A2840",borderRadius:"10px 10px 2px 10px",
+                  padding:"8px 12px",maxWidth:"85%",fontSize:12,color:T1,lineHeight:1.5}}>
+                  {msg.text}
                 </div>
-                {result.map((t,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:5}}>
-                    <div style={{width:5,height:5,borderRadius:3,background:ACC,flexShrink:0}}/>
-                    <span style={{fontSize:11,color:"#A0B0E0"}}>{t}</span>
-                  </div>
-                ))}
-              </>
+              </div>
+            ):(
+              <div style={{background:"#0D1A35",border:`0.5px solid ${ACC}`,borderRadius:10,padding:"10px 12px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:10}}>
+                  <span style={{color:ACC,display:"flex"}}>{Icon.spark(9)}</span>
+                  <span style={{fontSize:9,fontWeight:600,color:ACC}}>Tasks built</span>
+                </div>
+                {(msg.tasks||[]).map((t,tIdx)=>{
+                  const key=`${mIdx}_${tIdx}`;
+                  const meta=taskMeta[key]||{area:"inbox",due:"",time:""};
+                  return (
+                    <div key={tIdx} style={{marginBottom:10,paddingBottom:10,
+                      borderBottom:tIdx<msg.tasks.length-1?`0.5px solid ${BORD2}`:"none"}}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                        <div style={{width:5,height:5,borderRadius:3,background:ACC,flexShrink:0,marginTop:4}}/>
+                        <span style={{fontSize:12,color:T1,lineHeight:1.4}}>{t.text}</span>
+                      </div>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",paddingLeft:13}}>
+                        {/* Area */}
+                        <select value={meta.area}
+                          onChange={e=>setTaskMeta(prev=>({...prev,[key]:{...meta,area:e.target.value}}))}
+                          style={{background:"#111120",border:`0.5px solid ${BORD2}`,borderRadius:6,
+                            color:T2,fontSize:10,padding:"3px 6px",cursor:"pointer"}}>
+                          {areas.map(a=>(
+                            <option key={a.id} value={a.id}>{a.icon} {a.label}</option>
+                          ))}
+                        </select>
+                        {/* Due date */}
+                        <input type="date" value={meta.due}
+                          onChange={e=>setTaskMeta(prev=>({...prev,[key]:{...meta,due:e.target.value}}))}
+                          style={{background:"#111120",border:`0.5px solid ${BORD2}`,borderRadius:6,
+                            color:meta.due?T1:T2,fontSize:10,padding:"3px 6px",cursor:"pointer"}}/>
+                        {/* Time */}
+                        <input type="time" value={meta.time}
+                          onChange={e=>setTaskMeta(prev=>({...prev,[key]:{...meta,time:e.target.value}}))}
+                          style={{background:"#111120",border:`0.5px solid ${BORD2}`,borderRadius:6,
+                            color:meta.time?T1:T2,fontSize:10,padding:"3px 6px",cursor:"pointer"}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-          {!loading&&(
-            <button onClick={addAll}
-              style={{width:"100%",padding:"11px",borderRadius:9,border:"none",
-                background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>
-              Add all to Today
-            </button>
-          )}
-        </>
-      ) : (
+        ))}
+        {loading&&(
+          <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}}>
+            <div className="ai-spinner" style={{width:16,height:16,borderWidth:2}}/>
+            <span style={{fontSize:11,color:T2}}>Researching and building tasks…</span>
+          </div>
+        )}
+        {err&&<div style={{fontSize:12,color:PINK}}>{err}</div>}
+        <div ref={bottomRef}/>
+      </div>
+
+      {/* Input */}
+      <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+        <textarea value={text} onChange={e=>setText(e.target.value)} onKeyDown={handleKey}
+          placeholder={messages.length?"Add more or refine…":"Just type everything on your mind…"}
+          rows={2}
+          style={{...IS,flex:1,resize:"none",lineHeight:1.5,fontSize:12,
+            color:text?T1:"#4A4A70"}}
+          onFocus={e=>e.target.style.borderColor=ACC}
+          onBlur={e=>e.target.style.borderColor=BORD2}/>
         <button onClick={submit} disabled={!text.trim()||loading}
-          style={{width:"100%",padding:"11px",borderRadius:9,border:"none",
+          style={{padding:"8px 14px",borderRadius:9,border:"none",flexShrink:0,
             background:text.trim()&&!loading?ACC:"rgba(255,255,255,0.06)",
-            color:text.trim()&&!loading?"#fff":T2,
-            fontSize:13,fontWeight:600,cursor:"pointer"}}>
-          {loading?"Building…":"Build tasks"}
+            color:text.trim()&&!loading?"#fff":T2,fontSize:12,fontWeight:600,cursor:"pointer"}}>
+          {loading?"…":"Send"}
+        </button>
+      </div>
+
+      {/* Add all button */}
+      {hasTasks&&!loading&&(
+        <button onClick={addAll}
+          style={{width:"100%",padding:"11px",borderRadius:9,border:"none",marginTop:10,
+            background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+          Add all tasks
         </button>
       )}
     </Sheet>
@@ -1600,11 +1677,9 @@ export default function App() {
         <BrainDumpSheet
           onClose={()=>setShowBrainDump(false)}
           getToken={getToken}
-          onAddTasks={(taskTexts)=>{
-            setTasks(ts=>[...ts,...taskTexts.map(text=>({
-              id:uid(),text,area:"inbox",done:false,priority:"med",
-              due:"",time:"",dur:30,desc:"",notes:"",subtasks:[],
-            }))]);
+          areas={areas}
+          onAddTasks={(newTasks)=>{
+            setTasks(ts=>[...ts,...newTasks]);
           }}
         />
       )}
