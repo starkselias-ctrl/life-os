@@ -374,8 +374,9 @@ const Sheet = memo(function Sheet({ children, onClose, tall, noBlur }) {
       onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{background:"#16161F",border:`0.5px solid ${BORD}`,borderBottom:"none",
         borderRadius:"18px 18px 0 0",padding:"12px 20px 44px",width:"100%",
-        boxSizing:"border-box",maxHeight:tall?"93vh":"auto",overflowY:"auto"}}>
-        <div style={{width:36,height:4,borderRadius:3,background:BORD,margin:"0 auto 20px"}}/>
+        boxSizing:"border-box",
+        ...(tall?{height:"90vh",display:"flex",flexDirection:"column",overflowY:"hidden"}:{overflowY:"auto"})}}>
+        <div style={{width:36,height:4,borderRadius:3,background:BORD,margin:"0 auto 20px",flexShrink:0}}/>
         {children}
       </div>
     </div>
@@ -795,7 +796,7 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
   return (
     <Sheet onClose={onClose} tall noBlur>
       {/* Header */}
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexShrink:0}}>
         <div style={{background:"#1A0D35",border:`0.5px solid ${PURPLE}`,borderRadius:8,
           padding:"4px 8px",display:"inline-flex",alignItems:"center",gap:4}}>
           <span style={{color:PURPLE,lineHeight:1,display:"flex"}}>{Icon.spark(9)}</span>
@@ -885,7 +886,7 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
       </div>
 
       {/* Input */}
-      <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+      <div style={{display:"flex",gap:8,alignItems:"flex-end",flexShrink:0,marginTop:8}}>
         <textarea value={text} onChange={e=>setText(e.target.value)} onKeyDown={handleKey}
           placeholder={messages.length?"Add more or refine…":"Just type everything on your mind…"}
           rows={2}
@@ -904,7 +905,7 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
       {/* Add all button */}
       {hasTasks&&!loading&&(
         <button onClick={addAll}
-          style={{width:"100%",padding:"11px",borderRadius:9,border:"none",marginTop:10,
+          style={{width:"100%",padding:"11px",borderRadius:9,border:"none",marginTop:8,flexShrink:0,
             background:ACC,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>
           Add all tasks
         </button>
