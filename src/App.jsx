@@ -1769,7 +1769,11 @@ export default function App() {
                 background:"#0D1A35",color:ACC}}>Normal</span>
             )}
             {/* Pin to Today toggle */}
-            <button onClick={()=>setEditForm(f=>({...f,pinToday:!f.pinToday}))}
+            <button onClick={()=>{
+                const next=!editFormRef.current.pinToday;
+                setEditForm(f=>({...f,pinToday:next}));
+                setTasks(ts=>ts.map(t=>t.id===editFormRef.current.id?{...t,pinToday:next}:t));
+              }}
               style={{fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:999,cursor:"pointer",
                 border:`0.5px solid ${td.pinToday?ACC:BORD2}`,
                 background:td.pinToday?ACC+"20":"transparent",
