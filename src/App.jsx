@@ -802,7 +802,11 @@ function BrainDumpSheet({ onClose, onAddTasks, getToken, areas }) {
           <span style={{color:PURPLE,lineHeight:1,display:"flex"}}>{Icon.spark(9)}</span>
           <span style={{fontSize:9,fontWeight:600,color:PURPLE}}>AI</span>
         </div>
-        <span style={{fontSize:12,fontWeight:700,color:T1}}>Brain dump</span>
+        <span style={{fontSize:12,fontWeight:700,color:T1,flex:1}}>Brain dump</span>
+        <button onClick={onClose}
+          style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:8,
+            width:28,height:28,cursor:"pointer",fontSize:14,color:T2,
+            display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
       </div>
 
       {/* Conversation */}
@@ -1600,7 +1604,7 @@ export default function App() {
                 <div key={a.id} style={{borderRadius:14,overflow:"hidden",border:`0.5px solid ${isExp?th.border:BORD2}`}}>
                   {/* Compact header row */}
                   <div style={{background:isExp?th.bg:SURF,display:"flex",alignItems:"center",gap:10,padding:"11px 14px",cursor:"pointer"}}
-                    onClick={()=>{ setExpandedArea(isExp?null:a.id); setExpandedTask(null); }}>
+                    onClick={()=>{ if(isExp){ setActiveArea(a.id); setView("area"); setShowDone(false); } else { setExpandedArea(a.id); setExpandedTask(null); } }}>
                     <div style={{width:32,height:32,borderRadius:9,background:th.accent+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:th.accent,flexShrink:0}}>{a.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <span style={{fontSize:13,fontWeight:700,color:T1}}>{a.label}</span>
@@ -1609,7 +1613,8 @@ export default function App() {
                     <span style={{fontSize:12,fontWeight:700,color:th.accent,marginRight:4}}>{aOpen.length}</span>
                     <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
                       style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:10,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
-                    <span style={{color:T2,fontSize:14,marginLeft:2,transition:"transform 0.2s",display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}>›</span>
+                    <span onClick={e=>{ e.stopPropagation(); setExpandedArea(isExp?null:a.id); setExpandedTask(null); }}
+                      style={{color:T2,fontSize:14,marginLeft:2,transition:"transform 0.2s",display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}>›</span>
                   </div>
                   {/* Expanded task list */}
                   {isExp&&(
