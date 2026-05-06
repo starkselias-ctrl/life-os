@@ -15,8 +15,9 @@ export async function requireAuth(req, res) {
   try {
     const payload = await clerk.verifyToken(token);
     return payload.sub; // Clerk user ID
-  } catch {
-    res.status(401).json({ error: "Invalid token" });
+  } catch (e) {
+    console.error("verifyToken failed:", e.message, e.clerkError, e.errors);
+    res.status(401).json({ error: "Invalid token", detail: e.message });
     return null;
   }
 }
