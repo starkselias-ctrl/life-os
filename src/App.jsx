@@ -1580,116 +1580,87 @@ export default function App() {
           </div>
 
           {/* Expanded area — full width above the grid */}
-          {expandedArea && (()=>{
-            const ea=getArea(areas,expandedArea);
-            const eaIdx=areas.findIndex(a=>a.id===expandedArea);
-            const eaT=AREA_THEMES[eaIdx%AREA_THEMES.length];
-            const eaOpen=tasks.filter(t=>t.area===expandedArea&&!t.done);
-            return (
-              <div style={{marginBottom:12}}>
-                {/* Themed header — tap to collapse */}
-                <div style={{background:eaT.bg,border:`0.5px solid ${eaT.border}`,borderBottom:"none",borderRadius:"18px 18px 0 0",padding:"16px 18px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}
-                  onClick={()=>{ setExpandedArea(null); setExpandedTask(null); }}>
-                  <div style={{width:40,height:40,borderRadius:12,background:eaT.accent+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:eaT.accent}}>{ea.icon}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:16,fontWeight:700,color:T1}}>{ea.label}</div>
-                    <div style={{fontSize:12,color:T2}}>{eaOpen.length} open</div>
-                  </div>
-                  <span style={{color:eaT.accent,fontSize:18,display:"inline-block",transform:"rotate(90deg)"}}>›</span>
-                </div>
-                {/* Task list */}
-                <div style={{...gl(),borderRadius:"0 0 20px 20px",overflow:"hidden",borderTop:"none"}}>
-                  {eaOpen.length>0 ? eaOpen.map((t,i)=>{
-                    const subs=t.subtasks||[];
-                    const isExpT=expandedTask===t.id;
-                    return (
-                      <div key={t.id}>
-                        {/* Task row — tap body to toggle subtasks */}
-                        <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer"}}
-                          onClick={()=>setExpandedTask(et=>et===t.id?null:t.id)}>
-                          <button onClick={e=>{ e.stopPropagation(); toggle(t.id); }}
-                            style={{width:24,height:24,borderRadius:12,border:`2px solid ${eaT.accent}70`,background:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          </button>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:15,fontWeight:600,color:T1,lineHeight:1.3}}>{t.text}</div>
-                            {subs.length>0&&(
-                              <div style={{fontSize:11,color:T2,marginTop:2}}>{subs.filter(s=>s.done).length}/{subs.length} subtasks</div>
-                            )}
-                            {t.time&&<div style={{fontSize:11,color:T2,marginTop:1}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</div>}
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                            {subs.length>0&&(
-                              <span style={{fontSize:13,color:eaT.accent,display:"inline-block",transition:"transform 0.2s",transform:isExpT?"rotate(90deg)":"rotate(0deg)"}}>›</span>
-                            )}
-                            <span onClick={e=>{ e.stopPropagation(); openDetail(t.id); }}
-                              style={{fontSize:13,color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:"2px 4px"}}>⋯</span>
-                            {(()=>{ const isSel=selected.has(t.id); return (
-                              <button onClick={e=>{ e.stopPropagation(); setSelected(s=>{ const n=new Set(s); isSel?n.delete(t.id):n.add(t.id); return n; }); }}
-                                style={{background:isSel?ACC:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,
-                                  width:20,height:20,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                {isSel&&<span style={{color:"#fff",fontSize:10}}>✓</span>}
-                              </button>
-                            ); })()}
-                          </div>
-                        </div>
-                        {/* Subtasks */}
-                        {isExpT&&subs.length>0&&(
-                          <div style={{marginLeft:52,marginRight:16,marginBottom:10,borderRadius:12,overflow:"hidden",border:`1px solid ${eaT.accent}25`,background:`${eaT.accent}0D`}}>
-                            {subs.map((s,si)=>(
-                              <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderBottom:si<subs.length-1?`1px solid ${BORD}`:"none"}}>
-                                <button onClick={()=>toggleSub(t.id,s.id)}
-                                  style={{width:18,height:18,borderRadius:9,border:s.done?"none":`1.5px solid ${eaT.accent}60`,background:s.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                                  {s.done&&<span style={{color:"#fff",fontSize:9}}>✓</span>}
-                                </button>
-                                <span style={{fontSize:13,color:s.done?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.85)",textDecoration:s.done?"line-through":"none",flex:1,lineHeight:1.3}}>{s.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {i<eaOpen.length-1&&<div style={{height:1,background:BORD,marginLeft:16}}/>}
-                      </div>
-                    );
-                  }) : (
-                    <div style={{padding:"20px 18px",textAlign:"center",color:T2,fontSize:13}}>All done in {ea.label} ✓</div>
-                  )}
-                  <button onClick={()=>{ setActiveArea(expandedArea); setView("area"); setShowDone(false); }}
-                    style={{width:"100%",padding:"12px 16px",background:"none",border:"none",borderTop:`1px solid ${BORD}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <span style={{fontSize:13,fontWeight:700,color:ACC}}>View all & completed</span>
-                    <span style={{color:ACC,fontSize:14}}>›</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 2-column grid — non-expanded areas */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-            {areas.filter(a=>a.id!==expandedArea).map(a=>{
+          {/* Areas accordion list */}
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:20}}>
+            {areas.map(a=>{
               const i=areas.findIndex(ar=>ar.id===a.id);
               const th=AREA_THEMES[i%AREA_THEMES.length];
-              const at=tasks.filter(t=>t.area===a.id);
-              const openC=at.filter(t=>!t.done).length;
-              const doneC=at.filter(t=>t.done).length;
-              const pct=at.length?Math.round(doneC/at.length*100):0;
+              const aOpen=tasks.filter(t=>t.area===a.id&&!t.done);
+              const isExp=expandedArea===a.id;
               return (
-                <div key={a.id}
-                  style={{background:th.bg,border:`0.5px solid ${th.border}`,borderRadius:18,padding:"18px 16px",cursor:"pointer",position:"relative",minHeight:160,display:"flex",flexDirection:"column",justifyContent:"space-between"}}
-                  onClick={()=>{ setExpandedArea(a.id); setExpandedTask(null); }}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                    <div style={{width:44,height:44,borderRadius:12,background:th.accent+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:th.accent}}>{a.icon}</div>
+                <div key={a.id} style={{borderRadius:14,overflow:"hidden",border:`0.5px solid ${isExp?th.border:BORD2}`}}>
+                  {/* Compact header row */}
+                  <div style={{background:isExp?th.bg:SURF,display:"flex",alignItems:"center",gap:10,padding:"11px 14px",cursor:"pointer"}}
+                    onClick={()=>{ setExpandedArea(isExp?null:a.id); setExpandedTask(null); }}>
+                    <div style={{width:32,height:32,borderRadius:9,background:th.accent+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:th.accent,flexShrink:0}}>{a.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <span style={{fontSize:13,fontWeight:700,color:T1}}>{a.label}</span>
+                      {a.sub&&<span style={{fontSize:11,color:T2,marginLeft:6}}>{a.sub}</span>}
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:th.accent,marginRight:4}}>{aOpen.length}</span>
                     <button onClick={e=>{ e.stopPropagation(); openEditArea(a); }}
-                      style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:8,width:26,height:26,cursor:"pointer",fontSize:11,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
+                      style={{background:"rgba(255,255,255,0.06)",border:"none",borderRadius:6,width:22,height:22,cursor:"pointer",fontSize:10,color:T2,display:"flex",alignItems:"center",justifyContent:"center"}}>✎</button>
+                    <span style={{color:T2,fontSize:14,marginLeft:2,transition:"transform 0.2s",display:"inline-block",transform:isExp?"rotate(90deg)":"rotate(0deg)"}}>›</span>
                   </div>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:600,color:T2,marginBottom:4}}>{a.label}</div>
-                    <div style={{fontSize:32,fontWeight:800,color:th.accent,lineHeight:1}}>{openC}</div>
-                  </div>
+                  {/* Expanded task list */}
+                  {isExp&&(
+                    <div style={{borderTop:`0.5px solid ${th.border}`}}>
+                      {aOpen.length>0 ? aOpen.map((t,ti)=>{
+                        const subs=t.subtasks||[];
+                        const isExpT=expandedTask===t.id;
+                        const isSel=selected.has(t.id);
+                        return (
+                          <div key={t.id} style={{background:isSel?"rgba(91,143,255,0.08)":"transparent"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",borderBottom:`0.5px solid ${BORD}`}}
+                              onClick={()=>setExpandedTask(et=>et===t.id?null:t.id)}>
+                              <button onClick={e=>{ e.stopPropagation(); toggle(t.id); }}
+                                style={{width:22,height:22,borderRadius:11,border:`2px solid ${th.accent}60`,background:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                              </button>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:13,fontWeight:600,color:T1,lineHeight:1.3}}>{t.text}</div>
+                                {subs.length>0&&<div style={{fontSize:10,color:T2,marginTop:1}}>{subs.filter(s=>s.done).length}/{subs.length} subtasks</div>}
+                                {t.time&&<div style={{fontSize:10,color:T2,marginTop:1}}>{fmt(t.time)}{t.dur?` · ${t.dur}m`:""}</div>}
+                              </div>
+                              <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+                                {subs.length>0&&<span style={{fontSize:12,color:th.accent,transition:"transform 0.2s",display:"inline-block",transform:isExpT?"rotate(90deg)":"rotate(0deg)"}}>›</span>}
+                                <span onClick={e=>{ e.stopPropagation(); openDetail(t.id); }} style={{fontSize:13,color:"rgba(255,255,255,0.2)",cursor:"pointer",padding:"2px 4px"}}>⋯</span>
+                                <button onClick={e=>{ e.stopPropagation(); setSelected(s=>{ const n=new Set(s); isSel?n.delete(t.id):n.add(t.id); return n; }); }}
+                                  style={{background:isSel?ACC:"rgba(255,255,255,0.06)",border:"none",borderRadius:5,width:18,height:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                  {isSel&&<span style={{color:"#fff",fontSize:9}}>✓</span>}
+                                </button>
+                              </div>
+                            </div>
+                            {isExpT&&subs.length>0&&(
+                              <div style={{marginLeft:46,marginRight:14,marginBottom:8,borderRadius:10,overflow:"hidden",border:`1px solid ${th.accent}25`,background:`${th.accent}0D`}}>
+                                {subs.map((s,si)=>(
+                                  <div key={s.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderBottom:si<subs.length-1?`1px solid ${BORD}`:"none"}}>
+                                    <button onClick={()=>toggleSub(t.id,s.id)}
+                                      style={{width:16,height:16,borderRadius:8,border:s.done?"none":`1.5px solid ${th.accent}60`,background:s.done?GREEN:"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                      {s.done&&<span style={{color:"#fff",fontSize:8}}>✓</span>}
+                                    </button>
+                                    <span style={{fontSize:12,color:s.done?"rgba(255,255,255,0.3)":T1,textDecoration:s.done?"line-through":"none",flex:1}}>{s.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }) : (
+                        <div style={{padding:"16px",textAlign:"center",color:T2,fontSize:12}}>All done in {a.label} ✓</div>
+                      )}
+                      <button onClick={()=>{ setActiveArea(a.id); setView("area"); setShowDone(false); }}
+                        style={{width:"100%",padding:"10px 14px",background:"none",border:"none",borderTop:`1px solid ${BORD}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                        <span style={{fontSize:12,fontWeight:700,color:ACC}}>View all & completed</span>
+                        <span style={{color:ACC,fontSize:13}}>›</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
             <div onClick={openNewArea}
-              style={{borderRadius:22,padding:"20px 18px",cursor:"pointer",border:`2px dashed rgba(255,255,255,0.15)`,minHeight:170,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}>
-              <div style={{width:46,height:46,borderRadius:14,background:"rgba(255,255,255,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:T2}}>+</div>
+              style={{borderRadius:14,padding:"12px 14px",cursor:"pointer",border:`1.5px dashed rgba(255,255,255,0.12)`,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:32,height:32,borderRadius:9,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,color:T2}}>+</div>
               <div style={{fontSize:13,fontWeight:600,color:T2}}>New area</div>
             </div>
           </div>
